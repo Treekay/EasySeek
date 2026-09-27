@@ -33,7 +33,23 @@ SEEK IDs are extracted from `/job/12345678`; tracking parameters do not affect i
 
 Only explicitly recognized city names are normalized; unknown locations, remote-only text, and missing fields do not create a fallback key. Those listings use their ID instead of risking unrelated matches. Different jobs with an identical complete canonical key intentionally share a decision, as requested. This heuristic cannot distinguish separate vacancies with identical company/city/title.
 
-Records contain canonical key, linked SEEK IDs, title, company, city, status, timestamps, and the latest manual-action timestamp. SEEN/SKIP expire after **60 days since lastSeenAt**, including at the exact 60-day boundary. Encountering a remembered card, even one hidden by filters, or opening its detail refreshes lastSeenAt. Merely leaving a tab open does not continuously refresh it. PURSUE never expires automatically. Cleanup runs on worker requests (including SEEK load/pageshow); there is no scheduled task.
+Records contain canonical key, linked SEEK IDs, title, company, city, status, timestamps, and the latest manual-action timestamp. SEEN/SKIP default to **60 days since statusChangedAt**, including the exact expiry boundary. Retention measures the status decision, not repeated SEEK appearances. Observation may update `lastSeenAt` and link new listing IDs, but never changes `statusChangedAt` or extends retention. Opening an already remembered job also preserves its decision timestamp. PURSUE never expires automatically; it stays until you manually change or remove it.
+
+Seen and skipped retention are independently configurable as 30, 60, 90, 180 days or Never. `expiresAt = statusChangedAt + days × 86400000`. Saving a policy applies cleanup using the original timestamps, without rewriting them; shortening a policy requires confirmation and may immediately remove older records. Cleanup runs on worker requests (including SEEK load/pageshow and management-page refresh); there is no scheduled task. Expiry removes the complete opportunity and its linked IDs.
+
+Existing V1 records migrate automatically: SKIP/PURSUE use a meaningful `manualAt`; otherwise the fallback is `updatedAt`, then `lastSeenAt`, then `firstSeenAt`. If no usable timestamp exists, the migration time is used and persisted once. Migration preserves all existing fields and records; normal cleanup then applies the configured retention. Missing `statusChangedAt` alone never causes deletion. V1 observation overwrote `updatedAt`, so migrated SEEN timestamps are necessarily an approximation; after migration they remain stable.
+
+## Manage remembered jobs
+
+Open **chrome://extensions → EasySeek → Details → Extension options**, or click **Manage EasySeek** in the search control strip. The options page lets you inspect all remembered jobs without visiting SEEK.
+
+- Search title/company, filter All/SEEN/SKIP/PURSUE, and review records sorted by newest status assignment. Each row shows title, company, city, marked date, expiry or Never, last observation date, and all linked SEEK IDs.
+- Select a status and click **Apply**. This is a new manual decision, even if you choose the same status; its retention starts now. It does not pretend you observed the job again.
+- **Remove** clears the opportunity and all linked IDs after confirmation, just like Reset. It can appear as NEW again on SEEK.
+- **Settings** controls seen and skipped retention independently. PURSUE has no automatic expiry setting.
+- **Maintenance** offers Clear expired, Clear all SEEN, and Clear all SKIP, each requiring confirmation. These actions never bulk-delete PURSUE. Removal cannot be undone.
+
+All changes use the existing serialized background storage writer and propagate to open SEEK tabs. No full descriptions are stored or displayed in management.
 
 Removing the extension clears its local storage. Chrome profile sync is not used. Stored decisions can be inspected in the extension service worker console with `chrome.storage.local.get(null).then(console.log)`.
 
@@ -53,6 +69,7 @@ It never opens or contacts Career Ops. Description formatting becomes readable p
 | `src/storage.js` | Content-script messaging client. |
 | `src/content.js` | Dynamic DOM processing, navigation, filtering and actions. |
 | `src/ui.js`, `src/styles.css` | Small accessible controls, badges and feedback. |
+| `options/` | Local memory list, retention preferences and confirmed maintenance actions. |
 
 DOM assumptions are centralized in `EasySeekExtractor.selectors`:
 
@@ -68,13 +85,15 @@ If SEEK changes markup, edit the extractor selectors and test the actual page be
 Run the dependency-free state and worker tests:
 
 ```powershell
-node --test tests/state.test.cjs
-Get-ChildItem src\*.js | ForEach-Object { node --check $_.FullName }
+node --test tests/state.test.cjs tests/management.test.cjs
+Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
 Open `tests/browser.html` in Chrome to run a self-contained DOM fixture. The report below the sample jobs becomes PASS or FAIL. It uses the real extraction/content/UI scripts with mocked Chrome storage and clipboard APIs; it does not change extension storage or your clipboard. This covers hiding/recovery, actions, dynamic reposts, malformed cards, SPA navigation, manual Reset, and clipboard success/failure handling.
 
-Verified during implementation: all 9 Node tests and JavaScript syntax checks passed; the DOM fixture passed in headless Chrome. **Live SEEK DOM compatibility and real extension clipboard/storage integration remain unverified:** the public SEEK request returned a JavaScript/cookie verification challenge. Fixture success is not a substitute for the live checks below. The Manifest V3 content-script arrangement follows [Chrome's official documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts).
+`tests/options-browser.html` loads the actual options UI with mocked extension APIs to test search, sorting, state filtering, expiry display, edits, settings and confirmation/cancellation flows. Local file fetches in this fixture require Chrome's `--allow-file-access-from-files` flag when run headlessly.
+
+Verified during implementation: all 18 Node tests and JavaScript syntax checks passed; both DOM fixtures passed in headless Chrome. **Live SEEK DOM compatibility and real extension clipboard/storage integration remain unverified:** the public SEEK request returned a JavaScript/cookie verification challenge. Fixture success is not a substitute for the live checks below. The Manifest V3 content-script arrangement follows [Chrome's official documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts).
 
 ### Chrome acceptance checklist
 
@@ -86,6 +105,8 @@ Verified during implementation: all 9 Node tests and JavaScript syntax checks pa
 6. Check an available repost with the same company/city and hyphen/space title variation shares state; a different seniority title must not. Missing company/location should still match by ID.
 7. Load additional cards or change searches without refreshing; confirm actions/filtering appear without duplicates. Try the split detail view and browser Back/Forward.
 8. On a full detail click Analyze with Career Ops and paste into a text editor. Confirm the final paragraph, metadata, canonical URL, and analysis checklist are included. No external application should open.
-9. For a disposable record, use the service-worker console to set `lastSeenAt` to `Date.now() - 61 * 86400000`, then reload SEEK. SEEN/SKIP should disappear from storage; PURSUE should remain. Automated tests also cover the exact expiry boundary.
+9. Open Extension options and check search, status filters, marked/expiry dates, and linked IDs. Apply SEEN/SKIP/PURSUE to a disposable record and confirm its marked time resets. Observe it again on SEEK; only Last seen should change.
+10. Try Never and a shorter retention policy; verify the confirmation and expiry display. Confirm/cancel single removal and bulk cleanup. PURSUE must survive all bulk actions.
+11. For a disposable record with the default 60-day policy, use the service-worker console to set `statusChangedAt` to `Date.now() - 61 * 86400000`, then reload SEEK or Refresh options. SEEN/SKIP should disappear from storage even if `lastSeenAt` is recent; PURSUE should remain. Automated tests also cover the exact expiry boundary.
 
 V1 intentionally includes no dashboard, alerts integration, cloud sync, AI calls, job archive, or application automation.

@@ -42,6 +42,7 @@
     const count = element('span');
     count.setAttribute('aria-live', 'polite');
     node.append(count);
+    node.append(button('Manage EasySeek', () => EasySeekStorage.request('openOptions').catch(error => notify(error.message, true))));
     return { node, update(preferences, shown, hidden) {
       for (const key in inputs) inputs[key].checked = preferences[key];
       const message = `${shown} jobs shown · ${hidden} hidden`;

@@ -6,7 +6,7 @@
 .easyseek-controls { margin: 10px 0; }
 .easyseek-controls label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .easyseek-controls input { appearance: auto; width: 15px; height: 15px; margin: 0; accent-color: #245e83; }
-.easyseek-actions button { appearance: none; font: inherit; color: #244d70; background: #fff; border: 1px solid #bdcad5; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.easyseek-actions button, .easyseek-controls button { appearance: none; font: inherit; color: #244d70; background: #fff; border: 1px solid #bdcad5; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
 .easyseek-actions button:hover { background: #eaf1f7; }
 .easyseek-actions button:focus-visible, .easyseek-controls input:focus-visible { outline: 2px solid #245e83; outline-offset: 2px; }
 .easyseek-badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; }

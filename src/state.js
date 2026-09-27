@@ -37,8 +37,42 @@
     return [...records].sort((a, b) => (b.manualAt || 0) - (a.manualAt || 0) || b.updatedAt - a.updatedAt)[0];
   }
   function status(records, job) { return winner(matches(records, job))?.status || 'NEW'; }
-  function cleanup(records, now = Date.now()) {
-    return records.filter(r => r.status === 'PURSUE' || now - r.lastSeenAt < 60 * DAY);
+  const defaults = { hideSeen: true, hideSkipped: true, seenDays: 60, skipDays: 60 };
+  const validDays = value => value === null || (Number.isSafeInteger(value) && value > 0 && value <= 36500);
+  function preferences(saved = {}) {
+    const result = { ...defaults };
+    for (const key of ['hideSeen', 'hideSkipped']) if (typeof saved[key] === 'boolean') result[key] = saved[key];
+    for (const key of ['seenDays', 'skipDays']) if (validDays(saved[key])) result[key] = saved[key];
+    return result;
+  }
+  function recordKey(record) { return record.canonicalKey || 'seek:' + record.seekIds[0]; }
+  function migrate(records, now = Date.now()) {
+    return records.map(record => {
+      if (Number.isFinite(record.statusChangedAt) && record.statusChangedAt >= 0) return record;
+      const candidates = [
+        ...(['SKIP', 'PURSUE'].includes(record.status) ? [record.manualAt] : []),
+        record.updatedAt, record.lastSeenAt, record.firstSeenAt
+      ];
+      return { ...record, statusChangedAt: candidates.find(value => Number.isFinite(value) && value > 0) ?? now };
+    });
+  }
+  function expiresAt(record, settings = {}) {
+    const prefs = preferences(settings);
+    const days = record.status === 'SEEN' ? prefs.seenDays : record.status === 'SKIP' ? prefs.skipDays : null;
+    return days === null ? null : record.statusChangedAt + days * DAY;
+  }
+  function cleanup(records, now = Date.now(), settings = {}) {
+    return migrate(records, now).filter(record => {
+      const expiry = expiresAt(record, settings);
+      return expiry === null || now < expiry;
+    });
+  }
+  function manage(records, key, action, now = Date.now()) {
+    const record = records.find(item => recordKey(item) === key);
+    if (!record) throw new Error('This record no longer exists. Refresh the list.');
+    if (action === 'REMOVE') return records.filter(item => item !== record);
+    if (!['SEEN', 'SKIP', 'PURSUE'].includes(action)) throw new Error('Invalid status');
+    return records.map(item => item === record ? { ...item, status: action, statusChangedAt: now, manualAt: now, updatedAt: now } : item);
   }
   function apply(records, job, action, now = Date.now()) {
     const ident = identity(job);
@@ -58,10 +92,12 @@
       city: city(job.location) || old?.city || '', status: nextStatus,
       firstSeenAt: found.length ? Math.min(...found.map(r => r.firstSeenAt)) : now,
       lastSeenAt: now, updatedAt: now,
+      statusChangedAt: automatic && old ? migrate([old], now)[0].statusChangedAt : now,
       manualAt: automatic ? old?.manualAt || 0 : now
     };
     return [...rest, record];
   }
-  root.EasySeekState = { DAY, normalize, company, city, jobId, identity, matches, status, cleanup, apply };
+  root.EasySeekState = { DAY, normalize, company, city, jobId, identity, matches, status, cleanup, apply,
+    defaults, preferences, validDays, recordKey, migrate, expiresAt, manage };
   if (typeof module !== 'undefined') module.exports = root.EasySeekState;
 })(globalThis);

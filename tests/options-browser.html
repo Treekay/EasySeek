@@ -1,0 +1,56 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>EasySeek options tests</title>
+<pre id="report">RUNNING</pre><iframe title="Options page" style="width:100%;height:1100px;border:0"></iframe>
+<script src="../src/state.js"></script>
+<script>
+const S = EasySeekState;
+let records = [], preferences = S.preferences();
+var confirmations = [], allowConfirm = false;
+for (const [index, status] of ['SEEN', 'SKIP', 'PURSUE'].entries()) {
+  records = S.apply(records, { id: String(index + 1), title: ['Engineer', 'Designer', '<img src=x onerror=alert(1)>'][index], company: 'Example Ltd', location: 'Auckland' }, status, Date.now() - (index + 1) * S.DAY);
+}
+globalThis.mockChrome = { runtime: { async sendMessage(message) {
+  if (message.type === 'manage') records = S.manage(records, message.key, message.action);
+  if (message.type === 'preferences') preferences = S.preferences({ ...preferences, ...message.preferences });
+  if (message.type === 'bulk') {
+    if (!message.confirmed) throw new Error('Missing confirmation');
+    records = records.filter(record => record.status !== message.action);
+  }
+  records = S.cleanup(records, Date.now(), preferences);
+  return { ok: true, records, preferences };
+} }, storage: { onChanged: { addListener() {} } } };
+const pause = () => new Promise(resolve => setTimeout(resolve, 150));
+const assert = (value, message) => { if (!value) throw new Error(message); };
+(async () => {
+  const html = await (await fetch('../options/options.html')).text();
+  const frame = document.querySelector('iframe');
+  frame.srcdoc = html.replace('<head>', '<head><base href="' + new URL('../options/', location.href).href + '"><script>globalThis.chrome = parent.mockChrome; globalThis.confirm = message => { parent.confirmations.push(message); return parent.allowConfirm; };<\/script>');
+  await new Promise(resolve => frame.onload = resolve); await pause();
+  const doc = frame.contentDocument, win = frame.contentWindow;
+  const $ = id => doc.getElementById(id);
+  assert(doc.querySelectorAll('.record').length === 3, 'all remembered records');
+  assert(doc.querySelector('h3').textContent === 'Engineer', 'newest status first');
+  assert(!doc.querySelector('.record img'), 'stored text is not interpreted as HTML');
+  $('search').value = 'designer'; $('search').dispatchEvent(new win.Event('input'));
+  assert(doc.querySelectorAll('.record').length === 1, 'search');
+  $('search').value = ''; $('filter').value = 'PURSUE'; $('filter').dispatchEvent(new win.Event('change'));
+  assert(doc.querySelectorAll('.record').length === 1 && doc.querySelector('.dates').textContent.includes('Never'), 'status filter and expiry');
+  const row = doc.querySelector('.record'); row.querySelector('select').value = 'SKIP'; row.querySelector('button').click(); await pause();
+  assert(records.find(record => record.seekIds.includes('3')).status === 'SKIP', 'manual status update');
+  assert(doc.querySelectorAll('.record').length === 0, 'active filter updates');
+  $('filter').value = ''; $('filter').dispatchEvent(new win.Event('change'));
+  doc.querySelector('.record button:last-child').click(); await pause();
+  assert(records.length === 3 && confirmations.length === 1, 'remove cancellation');
+  allowConfirm = true; doc.querySelector('.record button:last-child').click(); await pause();
+  assert(records.length === 2, 'remove confirmed');
+  $('seenDays').value = 'never'; $('skipDays').value = '90';
+  $('settings').dispatchEvent(new win.Event('submit', { cancelable: true })); await pause();
+  assert(preferences.seenDays === null && preferences.skipDays === 90, 'retention saved');
+  allowConfirm = false; doc.querySelector('[data-bulk="SKIP"]').click(); await pause();
+  assert(records.length === 2, 'bulk cancellation');
+  allowConfirm = true; doc.querySelector('[data-bulk="SKIP"]').click(); await pause();
+  assert(records.length === 1 && records[0].status === 'SEEN', 'confirmed bulk removes selected state');
+  doc.querySelector('[data-bulk="EXPIRED"]').click(); await pause();
+  assert(records.length === 1, 'Never survives cleanup');
+  document.querySelector('#report').textContent = 'PASS: options rendering, sorting, search, filter, safe text, expiry, manual status, remove confirmation, settings, bulk confirmation';
+})().catch(error => document.querySelector('#report').textContent = 'FAIL: ' + error.stack);
+</script></html>
