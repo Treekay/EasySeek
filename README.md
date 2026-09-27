@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.3.2** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
+Version **1.3.3** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -154,3 +154,11 @@ Verified: 23 Node tests, JavaScript syntax checks, and both headless Chrome fixt
 6. Set Saved/Applied to finite retention and Viewed/Skip to Never, save, and inspect both expiry dates. Test shorter-policy confirmation and expired-memory cleanup with disposable data.
 7. Copy JD, paste into a text editor, then download .md and compare the contents, metadata, and final description paragraph. Confirm the filename and that nothing is stored in extension memory. Test after changing the active job.
 8. If upgrading, confirm old PURSUE becomes SAVED and old SEEN becomes viewed-only. Existing marks, filters and retention settings must be preserved.
+
+## Extension icon
+
+The blue magnifying-glass/check mark is an original, platform-neutral symbol for finding and selecting jobs. The editable vector is `icons/easyseek.svg`; Chrome uses the included 16, 32, 48 and 128 px PNG exports. The Memory tab also uses this icon. To rebuild the assets, run `python tools/generate_icons.py` with Pillow installed; this is optional development tooling and is not needed to load the extension.
+
+## Next platform
+
+LinkedIn Jobs support is the next planned platform. It is not enabled yet: it needs its own DOM adapter and platform-qualified job IDs so LinkedIn IDs cannot collide with SEEK IDs. Existing SEEK browsing, marks and memory behavior are unchanged.

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">EasySeek — find the right job</title>
+  <rect width="128" height="128" rx="28" fill="#2166CC"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M75 75 99 99" stroke-width="12"/>
+    <circle cx="54" cy="54" r="27" stroke-width="10"/>
+    <path d="M42 54 51 63 67 46" stroke-width="7"/>
+  </g>
+</svg>
