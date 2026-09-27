@@ -21,8 +21,6 @@
 #easyseek-filter-menu { display: flex; flex-direction: column; }
 .easyseek-filter-toggles { display: flex; gap: 6px; }
 .easyseek-filter-toggles button { width: 44px; height: 44px; flex: 0 0 44px; font-size: 10px; padding: 3px; }
-.easyseek-filter-tools { display: flex; justify-content: flex-end; gap: 6px; }
-.easyseek-filter-tools button { width: 44px; height: 44px; padding: 3px; font-size: 10px; }
 .easyseek-rail button[aria-pressed="true"] { background: #eaf2ff; border-color: #4981cf; color: #174c94; }
 .easyseek-feedback { position: fixed; bottom: 20px; right: 20px; max-width: min(420px, 90vw); padding: 10px 14px; font: 13px/1.5 system-ui, sans-serif; color: #fff; background: #23364b; border-radius: 8px; z-index: 2147483647; box-shadow: 0 4px 20px #0003; }
 .easyseek-feedback[hidden] { display: none; }

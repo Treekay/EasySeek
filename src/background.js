@@ -6,7 +6,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const isOptions = sender.url === `chrome-extension://${chrome.runtime.id}/options/options.html`;
   if (sender.id !== chrome.runtime.id || (!isOptions && !EasySeekState.isSeekUrl(sender.url)) || message?.channel !== 'easyseek') return;
   queue = queue.catch(() => {}).then(async () => {
-    if (message.type === 'openOptions') { await chrome.runtime.openOptionsPage(); return {}; }
+    if (message.type === 'openOptions') { await chrome.tabs.create({ url: chrome.runtime.getURL('options/options.html') }); return {}; }
     const stored = await chrome.storage.local.get(['records', 'preferences']);
     const now = Date.now();
     let records = EasySeekState.migrate(stored.records || [], now);

@@ -19,7 +19,8 @@
       copy: ['M9 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3', 'M9 2h6v5H9z', 'M8 12h8M8 16h6'],
       export: ['M12 3v12', 'm7 10 5 5 5-5', 'M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
       mark: ['m16 3 5 5-12 12-6 1 1-6Z', 'm14 5 5 5', 'm4 15 5 5'],
-      filter: ['M3 4h18l-7 8v7l-4 2V12Z']
+      filter: ['M3 4h18l-7 8v7l-4 2V12Z'],
+      memory: ['M9 3h6l.6 3 2.5 1.5L21 7l2 5-2.4 2 .4 3-4 3-2.6-1.4L12 21l-2.4-2.4L7 20l-4-3 .4-3L1 12l2-5 2.9.5L8.4 6Z', 'M15.5 12a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0']
     };
     for (const d of paths[kind]) { const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', d); svg.append(path); }
     return svg;
@@ -38,7 +39,7 @@
       const next = open === key ? '' : key; close();
       if (next) { open = next; panels[next].hidden = false; buttons[next].setAttribute('aria-expanded', 'true'); }
     }
-    for (const [key, label, title] of [['copy', 'Copy JD', 'Copy the current job as Markdown'], ['export', '.md', 'Download the current job as Markdown'], ['mark', 'Mark', 'Mark the current job'], ['filter', 'Filter', 'Filter search results']]) {
+    for (const [key, label, title] of [['copy', 'Copy JD', 'Copy the current job as Markdown'], ['export', '.md', 'Download the current job as Markdown'], ['mark', 'Mark', 'Mark the current job'], ['filter', 'Filter', 'Filter search results'], ['memory', 'Memory', 'Open EasySeek Memory in a new tab']]) {
       const row = element('div', '', 'easyseek-rail-row');
       buttons[key] = button(label, key, () => key === 'mark' || key === 'filter' ? toggle(key) : handlers[key](), 'easyseek-main easyseek-' + key);
       buttons[key].replaceChildren(icon(key));
@@ -63,9 +64,7 @@
       toggles[key].setAttribute('aria-label', 'Show ' + label + ' jobs');
       toggles[key].dataset.filter = key; filterRow.append(toggles[key]);
     }
-    const secondary = element('div', '', 'easyseek-filter-tools');
-    secondary.append(button('Memory', 'memory', handlers.memory));
-    panels.filter.append(filterRow, secondary);
+    panels.filter.append(filterRow);
     node.addEventListener('keydown', event => {
       if (event.key === 'Escape') { close(true); event.stopPropagation(); }
     });

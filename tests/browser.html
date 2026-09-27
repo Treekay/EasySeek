@@ -30,10 +30,12 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(rail && getComputedStyle(rail).position === 'fixed', 'fixed rail');
   const rect = rail.getBoundingClientRect();
   assert(Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 2 && innerWidth - rect.right < 20, 'right middle position');
-  assert(rail.querySelectorAll('.easyseek-main').length === 4, 'four main buttons');
+  assert(rail.querySelectorAll('.easyseek-main').length === 5, 'five main buttons');
   assert(!document.querySelector('article [data-easyseek-ui], #detail [data-easyseek-ui], .easyseek-controls, .easyseek-actions'), 'no inline controls');
   for (const action of ['copy', 'export', 'mark']) assert(button(action).disabled, 'no detail disables ' + action);
   assert(!button('filter').disabled, 'filter available without detail');
+  assert(button('memory').classList.contains('easyseek-main') && button('memory').querySelector('svg') && !button('memory').disabled, 'standalone settings icon always available');
+  assert(!menu('filter').querySelector('[data-action="memory"]'), 'Memory is outside filter menu');
   const detail = EasySeekExtractor.detail(document, 'https://nz.seek.com/job/12345678?x=1');
   assert(detail.job.url === 'https://nz.seek.com/job/12345678', 'canonical detail URL');
   assert(EasySeekExtractor.cards().get(card).url === detail.job.url, 'canonical card URL');

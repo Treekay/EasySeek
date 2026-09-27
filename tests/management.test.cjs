@@ -8,7 +8,8 @@ function worker(initial = {}) {
   let listener, opened = 0;
   const saved = structuredClone(initial);
   const context = vm.createContext({ EasySeekState: S, importScripts() {}, chrome: {
-    runtime: { id: 'test', async openOptionsPage() { opened++; }, onMessage: { addListener(fn) { listener = fn; } } },
+    runtime: { id: 'test', getURL(path) { return 'chrome-extension://test/' + path; }, onMessage: { addListener(fn) { listener = fn; } } },
+    tabs: { async create({ url }) { assert.equal(url, 'chrome-extension://test/options/options.html'); opened++; } },
     storage: { local: { async get() { return structuredClone(saved); }, async set(data) { Object.assign(saved, structuredClone(data)); } } }
   } });
   vm.runInContext(fs.readFileSync('src/background.js', 'utf8'), context);
