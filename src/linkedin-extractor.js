@@ -3,7 +3,7 @@
   const S = EasySeekState;
   // LinkedIn has separate signed-in and public layouts. Keep their clues here.
   const selectors = {
-    card: 'li[data-occludable-job-id], li.jobs-search-results__list-item, .job-card-container, .base-card, .base-search-card',
+    card: '[componentkey^="job-card-component-ref-"], li[data-occludable-job-id], li.jobs-search-results__list-item, .job-card-container, .base-card, .base-search-card',
     title: '.job-card-list__title, .job-card-container__link, .base-search-card__title',
     company: '.artdeco-entity-lockup__subtitle, .job-card-container__primary-description, .base-search-card__subtitle',
     location: '.job-card-container__metadata-item, .artdeco-entity-lockup__caption, .job-search-card__location',
@@ -42,10 +42,58 @@
       if (!title) continue;
       result.set(node, { platform: 'linkedin', id, title, company: read(node, selectors.company), location: read(node, selectors.location), url: S.canonicalUrl(id, 'linkedin') });
     }
+    // SDUI search cards are buttons, with no /jobs/view anchor.
+    for (const node of root.querySelectorAll('[role="button"][componentkey^="job-card-component-ref-"]')) {
+      const id = node.getAttribute('componentkey').match(/^job-card-component-ref-(\d+)$/)?.[1];
+      const paragraphs = [...node.querySelectorAll('p')];
+      const title = text(paragraphs[0]?.querySelector('[aria-hidden="true"]')) || text(paragraphs[0]);
+      if (!id || !title) continue;
+      result.set(node, { platform: 'linkedin', id, title, company: text(paragraphs[1]), location: text(paragraphs[2]), url: S.canonicalUrl(id, 'linkedin') });
+    }
     return result;
+  }
+  function sduiDetail(root, url) {
+    const routeId = S.linkedinJobId(url);
+    for (const body of root.querySelectorAll('[id^="JobDetails_AboutTheJob_"]')) {
+      const id = body.id.match(/^JobDetails_AboutTheJob_(\d+)$/)?.[1];
+      const description = body;
+      if (!body.querySelector('[data-testid="expandable-text-box"]')) continue;
+      if (!id || (routeId && routeId !== id) || !visible(description) || !text(description)) continue;
+      let scope = body.parentElement;
+      let links = [];
+      while (scope && scope !== root.body && scope !== root.documentElement) {
+        links = [...scope.querySelectorAll('a[href*="/jobs/view/"]')].filter(link => visible(link) && text(link) && !link.closest(selectors.card));
+        if (links.length) break;
+        scope = scope.parentElement;
+      }
+      // The body component and title link must independently identify the same job.
+      if (!links.length || links.some(link => S.linkedinJobId(link.href) !== id)) continue;
+      const heading = links[0];
+      const company = [...scope.querySelectorAll('a[href*="/company/"]')].find(link => visible(link) && text(link) && (link.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING));
+      const metadata = [...scope.querySelectorAll('p')].find(node =>
+        (heading.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+        (node.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING) && text(node).includes('·') && /\b(?:ago|applicants|clicked apply)\b/i.test(text(node)));
+      const meta = text(metadata);
+      // Read the whole AboutTheJob component: list items may sit outside the
+      // expandable span after HTML parsing. Exclude its heading and UI affordance.
+      let descriptionText = text(description);
+      const label = text(body.querySelector('h2'));
+      if (label && descriptionText.startsWith(label)) descriptionText = descriptionText.slice(label.length).trim();
+      const more = text(description.querySelector('[data-testid="expandable-text-button"]'));
+      if (more && descriptionText.endsWith(more)) descriptionText = descriptionText.slice(0, -more.length).trim();
+      if (!descriptionText) continue;
+      return { node: scope, heading, descriptionNode: description, job: {
+        platform: 'linkedin', id, title: text(heading), company: text(company), location: meta.split('·')[0].trim(),
+        posted: meta.match(/(?:reposted\s+)?(?:\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|just now|today|yesterday)/i)?.[0] || '',
+        salary: '', url: S.canonicalUrl(id, 'linkedin'), description: descriptionText
+      } };
+    }
+    return null;
   }
   function detail(root = document, url = location.href) {
     if (!S.isLinkedInJobsUrl(url)) return null;
+    const current = sduiDetail(root, url);
+    if (current) return current;
     const headings = [...root.querySelectorAll(selectors.detailTitle)].filter(node => visible(node) && text(node) && !node.closest(selectors.card));
     // Pair title and body inside the same detail panel, ignoring empty loading
     // placeholders and hidden duplicate panels. Titles may contain h1, h2 or links.

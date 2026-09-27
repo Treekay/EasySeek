@@ -117,7 +117,7 @@
       if (toObserve.length) store.request('observe', { jobs: toObserve }).catch(fail);
     } catch (error) { fail(error); }
     finally {
-      if (activePage()) observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'data-job-id', 'data-occludable-job-id', 'data-entity-urn', 'hidden', 'aria-hidden'] });
+      if (activePage()) observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['id', 'componentkey', 'href', 'data-job-id', 'data-occludable-job-id', 'data-entity-urn', 'hidden', 'aria-hidden'] });
       running = false;
       if (rerun) { rerun = false; schedule(); }
     }

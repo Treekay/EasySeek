@@ -8,6 +8,7 @@ test('LinkedIn URLs: numeric, slug, search selection, collection, unrelated host
     assert.equal(S.linkedinJobId(origin + '/jobs/view/123/?tracking=x'), '123');
     assert.equal(S.linkedinJobId(origin + '/jobs/view/full-stack-engineer-at-example-123'), '123');
     assert.equal(S.linkedinJobId(origin + '/jobs/search/?currentJobId=123&keywords=engineer'), '123');
+    assert.equal(S.linkedinJobId(origin + '/jobs/search-results/?currentJobId=4461706468&trackingId=ignored'), '4461706468');
     assert.equal(S.linkedinJobId(origin + '/jobs/collections/recommended/?currentJobId=123'), '123');
     assert.equal(S.isSupportedPage(origin + '/jobs/'), true);
     assert.equal(S.isSupportedPage(origin + '/feed/'), false);

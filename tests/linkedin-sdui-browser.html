@@ -1,0 +1,71 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>LinkedIn adapter fixture</title>
+<link rel="stylesheet" href="../src/styles.css">
+<!-- Reduced SDUI structure from the supplied page; synthetic content only. -->
+<main><div id="results">
+<div role="button" componentkey="job-card-component-ref-123"><div componentkey="job-card-component-ref-123"><p><span class="visually-hidden">Selected, Engineer (Verified job)</span><span aria-hidden="true">Engineer</span></p><div><p>Example</p></div><p>Auckland</p></div></div>
+</div><section id="detail"><div><a href="https://www.linkedin.com/company/example/">Example</a><p><a href="https://www.linkedin.com/jobs/view/123/?tracking=x">Engineer</a></p><p><span>Auckland, New Zealand</span> · <span>Reposted 4 days ago</span> · Over 100 people clicked apply</p></div>
+<div id="JobDetails_AboutTheJob_123" componentkey="JobDetails_AboutTheJob_123"><div data-sdui-component="com.linkedin.sdui.generated.jobseeker.dsl.impl.aboutTheJob"><h2>About the job</h2><p><span data-testid="expandable-text-box">Opening paragraph<br><br>Responsibilities<ul><li>First requirement</li><li>Final requirement</li></ul><button data-testid="expandable-text-button">… more</button></span></p></div></div>
+<div id="JobDetails_AboutTheCompany_123"><h2>About the company</h2><span data-testid="expandable-text-box">Company description must not enter JD</span></div>
+</section></main>
+<pre id="report">RUNNING</pre>
+<script src="../src/state.js"></script><script src="../src/linkedin-extractor.js"></script>
+<script>
+const S = EasySeekState, E = EasySeekExtractor;
+const realDetail = E.detail, realActive = E.active, realRouteId = E.routeId;
+// Map local fixture paths onto real LinkedIn routes; extraction and URL validation stay real.
+function route(url = location.href) { const params = new URL(url).searchParams; return 'https://www.linkedin.com' + (params.get('path') || '/jobs/search-results/') + (params.get('id') ? '?currentJobId=' + params.get('id') : ''); }
+E.detail = () => realDetail(document, route()); E.active = url => realActive(route(url)); E.routeId = url => realRouteId(route(url));
+let records = [], preferences = S.preferences();
+const listeners = [];
+globalThis.chrome = { runtime: { async sendMessage(message) {
+  if (message.type === 'action') records = S.apply(records, message.job, message.action);
+  if (message.type === 'observe') for (const job of message.jobs) records = S.apply(records, job, 'OBSERVE');
+  if (message.type === 'preferences') Object.assign(preferences, message.preferences);
+  return { ok: true, records, preferences };
+} }, storage: { onChanged: { addListener(fn) { listeners.push(fn); } } } };
+</script>
+<script src="../src/storage.js"></script><script src="../src/jd.js"></script><script src="../src/ui.js"></script><script src="../src/content.js"></script>
+<script>
+const pause = () => new Promise(resolve => setTimeout(resolve, 400));
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+(async () => {
+  await pause(); await pause();
+  const button = key => document.querySelector(`[data-action="${key}"]`);
+  const card = document.querySelector('[role="button"][componentkey]');
+  const detail = document.querySelector('#detail');
+  const body = document.querySelector('[id^="JobDetails_AboutTheJob_"]');
+  const title = detail.querySelector('a[href*="/jobs/view/"]');
+  const extracted = realDetail(document, 'https://www.linkedin.com/jobs/search-results/?currentJobId=123&trackingId=x');
+  assert(extracted.job.title === 'Engineer' && extracted.job.company === 'Example' && extracted.job.location === 'Auckland, New Zealand', 'SDUI metadata');
+  assert(extracted.job.description.includes('Final requirement') && !extracted.job.description.includes('Company description') && !extracted.job.description.includes('more'), 'full JD including lists, no company or controls');
+  const loadedBody = body.innerHTML;
+  body.innerHTML = '<h2>About the job</h2><span data-testid="expandable-text-box"></span>';
+  assert(realDetail(document, 'https://www.linkedin.com/jobs/search-results/?currentJobId=123') === null, 'empty loading body rejected');
+  body.innerHTML = loadedBody;
+  assert(E.cards().size === 1 && E.cards().get(card).title === 'Engineer', 'button card deduplicated without accessibility label');
+  for (const key of ['copy', 'export', 'mark']) assert(!button(key).disabled, key + ' enabled');
+  assert(records[0].lastViewedAt !== null, 'view recorded');
+  let copied = '', blob;
+  Object.defineProperty(navigator, 'clipboard', { value: { async writeText(value) { copied = value; } } });
+  URL.createObjectURL = value => { blob = value; return 'blob:fixture'; };
+  HTMLAnchorElement.prototype.click = function () {};
+  button('copy').click(); await pause(); button('export').click(); await pause();
+  assert(copied.includes('Final requirement') && await blob.text() === copied, 'copy and export full JD');
+  button('mark').click(); button('mark-SKIP').click(); await pause();
+  assert(card.classList.contains('easyseek-hidden') && records[0].mark === 'SKIP', 'skip filters SDUI card');
+  button('filter').click(); button('hideSkipped').click(); await pause();
+  assert(!card.classList.contains('easyseek-hidden'), 'restore SDUI card');
+  const clone = card.cloneNode(true); clone.setAttribute('componentkey','job-card-component-ref-456'); clone.querySelector('[componentkey]').setAttribute('componentkey','job-card-component-ref-456'); document.querySelector('#results').append(clone); await pause();
+  assert(records[0].linkedinIds.includes('456'), 'dynamic SDUI card alias');
+  history.pushState({}, '', '?id=999'); window.dispatchEvent(new PopStateEvent('popstate')); await pause();
+  assert(button('copy').disabled, 'route changed before body');
+  title.href = 'https://www.linkedin.com/jobs/view/999/'; title.textContent = 'Next engineer'; await pause();
+  assert(button('mark').disabled && !records.some(record => record.linkedinIds.includes('999')), 'new title with old body rejected');
+  body.id = 'JobDetails_AboutTheJob_999'; body.setAttribute('componentkey',body.id);
+  body.querySelector('[data-testid="expandable-text-box"]').textContent = 'New job description'; await pause(); await pause();
+  assert(!button('copy').disabled && records.some(record => record.linkedinIds.includes('999')), 'new ID component enables loaded job');
+  body.hidden = true; await pause(); assert(button('copy').disabled, 'hidden body disabled');
+  body.hidden = false; await pause(); assert(!button('copy').disabled, 'visible body enabled');
+  document.querySelector('#report').textContent = 'PASS: SDUI search-results metadata, full JD, enabled actions, copy/export, marks/filters, dynamic cards, ID mismatch and SPA';
+})().catch(error => document.querySelector('#report').textContent = 'FAIL: ' + error.stack);
+</script></html>
