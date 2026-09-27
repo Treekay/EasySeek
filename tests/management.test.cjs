@@ -40,7 +40,7 @@ test('options can migrate and manage; SEEK can open options but not remove recor
   assert.ok(result.ok); assert.equal(w.saved.records[0].mark, 'SAVED');
   const key = S.recordKey(result.records[0]);
   result = await w.send({ type: 'manage', key, action: 'APPLIED' });
-  assert.equal(result.records[0].mark, 'APPLIED');
+  assert.equal(result.records[0].applicationStage, 'APPLIED');
   assert.equal((await w.send({ type: 'manage', key, action: 'REMOVE' }, 'https://www.seek.co.nz/jobs')).ok, false);
   await w.send({ type: 'openOptions' }, 'https://www.seek.co.nz/jobs'); assert.equal(w.opened, 1);
   assert.equal(await w.send({ type: 'read' }, 'https://example.com/'), null);
@@ -53,7 +53,7 @@ test('settings apply before cleanup, preserve timestamps, validate all new field
   const w = worker({ records });
   let result = await w.send({ type: 'preferences', preferences: { skipDays: null, savedDays: 90, appliedDays: 180, viewedDays: 30, hideSaved: true, hideApplied: true, hideViewed: true } });
   assert.equal(result.records.length, 1); assert.equal(result.records[0].markChangedAt, timestamp);
-  assert.equal(result.preferences.appliedDays, 180); assert.equal(result.preferences.hideSaved, true);
+  assert.equal(result.preferences.appliedDays, null); assert.equal(result.preferences.hideSaved, true);
   result = await w.send({ type: 'preferences', preferences: { skipDays: 0 } });
   assert.equal(result.ok, false); assert.equal(w.saved.preferences.skipDays, null);
   result = await w.send({ type: 'preferences', preferences: { skipDays: 30 } });
@@ -68,10 +68,10 @@ test('serialized VIEW and manual marks from simultaneous tabs remain independent
   ]);
   assert.ok(results.every(result => result.ok));
   assert.equal(w.saved.records.length, 2);
-  assert.deepEqual(S.getState(w.saved.records, job), { mark: 'SAVED', viewed: true });
+  assert.deepEqual(S.getState(w.saved.records, job), { mark: 'SAVED', viewed: true, applicationStage: 'NONE', applicationHistory: [] });
   const key = S.recordKey(w.saved.records[0]);
   await w.send({ type: 'manage', key, action: 'NONE' });
-  assert.deepEqual(S.getState(w.saved.records, job), { mark: 'NONE', viewed: true });
+  assert.deepEqual(S.getState(w.saved.records, job), { mark: 'NONE', viewed: true, applicationStage: 'NONE', applicationHistory: [] });
 });
 test('cleanup requires confirmation; default saved/applied survive', async () => {
   const w = worker({ records: [...S.apply([], job, 'SAVED', 0), ...S.apply([], { id: '2' }, 'APPLIED', 0)] });
@@ -88,4 +88,17 @@ test('LinkedIn Jobs messages accepted, feed and lookalike senders rejected', asy
     assert.equal(result.records[0].url, 'https://www.linkedin.com/jobs/view/1/');
   }
   for (const url of ['https://www.linkedin.com/feed/', 'https://www.linkedin.com.evil.test/jobs/search/']) assert.equal(await w.send({ type: 'read' }, url), null);
+});
+
+test('worker migration, serialized progress and restart preserve application event history', async () => {
+  let w = worker({ records: [{ schemaVersion: 3, platform: 'seek', seekIds: ['1'], canonicalKey: '', mark: 'APPLIED', markChangedAt: 0, firstSeenAt: 0, lastViewedAt: 0, updatedAt: 0 }], preferences: { appliedDays: 30 } });
+  let result = await w.send({ type: 'read' });
+  assert.equal(result.records[0].applicationHistory[0].at, 0);
+  const key = S.recordKey(result.records[0]);
+  await Promise.all(['INTERVIEW', 'INTERVIEW', 'REJECTED'].map(action => w.send({ type: 'manage', key, action })));
+  const persisted = structuredClone(w.saved);
+  w = worker(persisted); result = await w.send({ type: 'read' });
+  assert.deepEqual(result.records[0].applicationHistory.map(event => event.stage), ['APPLIED', 'INTERVIEW', 'REJECTED']);
+  assert.equal(result.records[0].applicationStage, 'REJECTED');
+  assert.deepEqual(w.saved.records[0].applicationHistory, persisted.records[0].applicationHistory);
 });

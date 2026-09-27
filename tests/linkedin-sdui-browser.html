@@ -53,7 +53,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   HTMLAnchorElement.prototype.click = function () {};
   button('copy').click(); await pause(); button('export').click(); await pause();
   assert(copied.includes('Final requirement') && await blob.text() === copied, 'copy and export full JD');
-  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "none"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(copied.startsWith('---\neasyseek_schema: 2\n') && copied.includes('mark: "none"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
   assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
   assert(!records.some(record => 'description' in record), 'no full JD persistence');
   button('mark').click(); button('mark-SKIP').click(); await pause();

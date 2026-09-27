@@ -28,3 +28,9 @@ button:disabled { opacity: .55; cursor: wait; }
 .badge[data-state="APPLIED"] { color: #394d91; background: #edf0fc; }
 #filters label { display: flex; align-items: center; gap: 6px; }
 #settings h3 { margin: 16px 0 10px; }
+
+.badge[data-state="INTERVIEW"] { color: #68418d; background: #f2eafa; }
+.badge[data-state="OFFERED"] { color: #17634f; background: #e5f3ed; }
+.badge[data-state="REJECTED"] { color: #873c30; background: #f9efeb; }
+.record details { margin: 10px 0; }
+.record summary { cursor: pointer; }

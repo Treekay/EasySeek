@@ -45,7 +45,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(!button('copy').disabled && S.getState(records, detail.job).viewed, 'split detail active and viewed');
   button('mark').click();
   assert(!menu('mark').hidden && menu('mark').getBoundingClientRect().right < button('mark').getBoundingClientRect().left, 'mark menu expands left');
-  const widths = [...menu('mark').children].map(node => node.getBoundingClientRect().width);
+  const widths = [...menu('mark').querySelectorAll('button')].map(node => node.getBoundingClientRect().width);
   assert(widths.every(width => width === widths[0]), 'equal mark buttons');
   button('mark-SAVED').click(); await pause();
   assert(menu('mark').hidden && button('mark').dataset.mark === 'SAVED' && button('mark').querySelector('svg'), 'mark selection collapses and reflects mark');
@@ -82,7 +82,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   button('export').click(); await pause();
   assert(await exported.text() === copied && downloaded === 'xero-limited-full-stack-engineer-seek-12345678.md', 'export same markdown and safe filename');
   assert(!records.some(record => 'description' in record), 'no JD persistence');
-  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "saved"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(copied.startsWith('---\neasyseek_schema: 2\n') && copied.includes('mark: "saved"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
   assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
   assert(!records.some(record => 'description' in record), 'no full JD persistence');
   navigator.clipboard.writeText = async () => { throw new Error('denied'); };
@@ -102,7 +102,17 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   EasySeekExtractor.detail = () => extract(document, 'https://nz.seek.com/job/88888888');
   await navigate('?full-detail'); assert(!button('mark').disabled, 'full detail active');
   button('mark').click(); button('mark-APPLIED').click(); await pause();
-  assert(records.some(record => record.seekIds.includes('88888888') && record.mark === 'APPLIED'), 'full detail mark');
+  assert(records.some(record => record.seekIds.includes('88888888') && record.applicationStage === 'APPLIED'), 'full detail mark');
+  for (const stage of ['INTERVIEW', 'OFFERED', 'REJECTED']) {
+    button('mark').click(); button('mark-' + stage).click(); await pause();
+    assert(button('mark').dataset.stage === stage && button('mark').title.includes(stage), 'rail shows current progress');
+  }
+  const application = records.find(record => record.seekIds.includes('88888888'));
+  assert(application.applicationHistory.map(event => event.stage).join(',') === 'APPLIED,INTERVIEW,OFFERED,REJECTED', 'rail records complete progress');
+  button('mark').click(); button('mark-REJECTED').click(); await pause();
+  assert(records.find(record => record.seekIds.includes('88888888')).applicationHistory.length === 4, 'same stage does not duplicate');
+  button('export').click(); await pause();
+  assert((await exported.text()).includes('application_stage: "rejected"') && (await exported.text()).includes('"stage":"INTERVIEW"'), 'JD handoff contains stage history');
   EasySeekExtractor.detail = extract;
   await navigate('?no-detail'); for (const action of ['copy', 'export', 'mark']) assert(button(action).disabled, 'leaving detail disables ' + action);
   assert(document.querySelectorAll('.easyseek-rail').length === 1, 'single rail across SPA changes');

@@ -29,8 +29,8 @@ test('legacy stored marks and viewed history survive production-domain observati
     const updated = S.apply(records, { url: 'https://nz.seek.com/job/12345678?tracking=new' }, 'OBSERVE', 30);
     assert.equal(updated.length, 1);
     assert.equal(updated[0].url, 'https://nz.seek.com/job/12345678');
-    assert.equal(updated[0].mark, mark);
-    assert.equal(updated[0].markChangedAt, 20);
+    assert.equal(mark === 'APPLIED' ? updated[0].applicationStage : updated[0].mark, mark);
+    assert.equal(mark === 'APPLIED' ? updated[0].applicationStageChangedAt : updated[0].markChangedAt, 20);
     assert.equal(updated[0].lastViewedAt, 10);
     assert.deepEqual(updated[0].seekIds, records[0].seekIds);
     assert.equal(updated[0].canonicalKey, records[0].canonicalKey);
@@ -45,10 +45,10 @@ test('identity ignores tracking, normalizes suffixes/hyphens, preserves seniorit
   assert.notEqual(S.identity({ ...job, title: 'Software Engineer' }).key, S.identity({ ...job, title: 'Senior Software Engineer' }).key);
 });
 test('unseen NONE has no record; viewing records history without marking', () => {
-  assert.deepEqual(S.getState([], job), { mark: 'NONE', viewed: false });
+  assert.deepEqual(S.getState([], job), { mark: 'NONE', viewed: false, applicationStage: 'NONE', applicationHistory: [] });
   assert.deepEqual(S.apply([], job, 'OBSERVE', 0), []);
   const records = S.apply([], job, 'VIEW', 0);
-  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: true });
+  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: true, applicationStage: 'NONE', applicationHistory: [] });
   assert.equal(records[0].lastViewedAt, 0);
   assert.equal(records[0].markChangedAt, null);
 });
@@ -58,8 +58,8 @@ test('opening never changes a mark or its timestamp; observation never counts as
     records = S.apply(records, job, 'OBSERVE', S.DAY);
     assert.equal(records[0].lastViewedAt, null);
     records = S.apply(records, job, 'VIEW', 2 * S.DAY);
-    assert.equal(records[0].mark, mark);
-    assert.equal(records[0].markChangedAt, 0);
+    assert.equal(mark === 'APPLIED' ? records[0].applicationStage : records[0].mark, mark);
+    assert.equal(mark === 'APPLIED' ? records[0].applicationStageChangedAt : records[0].markChangedAt, 0);
     assert.equal(records[0].lastViewedAt, 2 * S.DAY);
   }
 });
@@ -88,14 +88,14 @@ test('view and mark expiry clear only their own concept', () => {
   for (const mark of ['SAVED', 'APPLIED']) {
     let keep = S.apply(S.apply([], job, 'VIEW', 0), job, mark, 1);
     keep = S.cleanup(keep, 10000 * S.DAY);
-    assert.equal(keep[0].mark, mark); assert.equal(keep[0].lastViewedAt, null);
+    assert.equal(mark === 'APPLIED' ? keep[0].applicationStage : keep[0].mark, mark); assert.equal(keep[0].lastViewedAt, null);
   }
 });
 test('clear mark keeps viewed history; remove discards entire linked opportunity', () => {
   let records = S.apply(S.apply([], job, 'VIEW', 0), job, 'SAVED', 1);
   records = S.apply(records, { ...job, id: '99' }, 'OBSERVE', 2);
   records = S.apply(records, job, 'NONE', 3);
-  assert.deepEqual(S.getState(records, { id: '99' }), { mark: 'NONE', viewed: true });
+  assert.deepEqual(S.getState(records, { id: '99' }), { mark: 'NONE', viewed: true, applicationStage: 'NONE', applicationHistory: [] });
   assert.equal(records[0].lastViewedAt, 0);
   records = S.manage(records, S.recordKey(records[0]), 'REMOVE', 4);
   assert.equal(records.length, 0); assert.equal(S.getState(records, job).mark, 'NONE');
@@ -105,14 +105,14 @@ test('manual management marks restart retention without changing view date', () 
   let records = S.apply([], job, 'VIEW', 0), key = S.recordKey(records[0]);
   for (const [index, mark] of ['SKIP', 'SAVED', 'APPLIED', 'SKIP'].entries()) {
     records = S.manage(records, key, mark, (index + 1) * S.DAY);
-    assert.equal(records[0].markChangedAt, (index + 1) * S.DAY);
+    assert.equal(mark === 'APPLIED' ? records[0].applicationStageChangedAt : records[0].markChangedAt, (index + 1) * S.DAY);
     assert.equal(records[0].lastViewedAt, 0);
   }
   records = S.manage(records, key, 'NONE', 10 * S.DAY);
   assert.equal(records[0].lastViewedAt, 0); assert.equal(records[0].mark, 'NONE');
 });
 test('each retention setting supports finite or Never without rewriting timestamps', () => {
-  for (const [mark, key] of [['SKIP', 'skipDays'], ['SAVED', 'savedDays'], ['APPLIED', 'appliedDays']]) {
+  for (const [mark, key] of [['SKIP', 'skipDays'], ['SAVED', 'savedDays']]) {
     const records = S.apply([], job, mark, 0);
     assert.equal(S.cleanup(records, 40 * S.DAY, { [key]: 30 }).length, 0);
     assert.equal(S.cleanup(records, 400 * S.DAY, { [key]: null }).length, 1);
@@ -128,9 +128,9 @@ test('all filters independent, default only Skip, selecting all types shows ever
     assert.equal(S.hidden({ mark, viewed }, { hideViewed: true }), mark === 'SKIP' || viewed);
     assert.equal(S.hidden({ mark, viewed }, { hideSkipped: false, hideSaved: false, hideApplied: false, hideViewed: false }), false);
   }
-  assert.equal(S.hidden({ mark: 'APPLIED', viewed: false }, { hideApplied: true }), true);
-  assert.equal(S.hidden({ mark: 'SAVED', viewed: false }, { hideSaved: true }), true);
-  assert.equal(S.hidden({ mark: 'SKIP', viewed: false }, { hideSkipped: false }), false);
+  assert.equal(S.hidden({ mark: 'NONE', viewed: false, applicationStage: 'APPLIED', applicationHistory: [] }, { hideApplied: true }), true);
+  assert.equal(S.hidden({ mark: 'SAVED', viewed: false, applicationStage: 'NONE', applicationHistory: [] }, { hideSaved: true }), true);
+  assert.equal(S.hidden({ mark: 'SKIP', viewed: false, applicationStage: 'NONE', applicationHistory: [] }, { hideSkipped: false }), false);
 });
 test('migration maps old marks/history conservatively and is idempotent', () => {
   const legacy = ['SEEN', 'SKIP', 'PURSUE'].map(status => ({ canonicalKey: 'xero|auckland|engineer', seekIds: ['1', '2'], title: 'Engineer', company: 'Xero', city: 'auckland', status, firstSeenAt: 10, lastSeenAt: 300, updatedAt: 200, manualAt: 100 }));

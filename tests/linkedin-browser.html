@@ -63,7 +63,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   button('copy').click(); await pause(); button('export').click(); await pause();
   assert(copied.includes('LinkedIn Job ID') && copied.includes('Final paragraph') && copied.includes('https://www.linkedin.com/jobs/view/123/'), 'LinkedIn Markdown');
   assert(await blob.text() === copied && filename.endsWith('-123.md'), 'download handoff');
-  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "skip"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(copied.startsWith('---\neasyseek_schema: 2\n') && copied.includes('mark: "skip"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
   assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
   assert(!records.some(record => 'description' in record), 'no full JD persistence');
   const clone = card.cloneNode(true); clone.dataset.occludableJobId = '456'; clone.querySelector('a').href = 'https://www.linkedin.com/jobs/view/456/'; document.querySelector('#results').append(clone); await pause(); await pause();

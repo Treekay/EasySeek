@@ -28,8 +28,8 @@ const job = { platform: 'seek', id: '12345678', title: 'Software Engineer', comp
 test('SEEK handoff has versioned metadata, existing canonical identity and normalized URL', () => {
   const output = J.markdown(job, { mark: 'SAVED', viewed: true }, when);
   assert.deepEqual(metadata(output), {
-    easyseek_schema: 1, platform: 'seek', job_id: '12345678', canonical_url: 'https://nz.seek.com/job/12345678',
-    canonical_key: S.identity(job).canonicalKey, mark: 'saved', viewed: true, title: job.title, company: job.company,
+    easyseek_schema: 2, platform: 'seek', job_id: '12345678', canonical_url: 'https://nz.seek.com/job/12345678',
+    canonical_key: S.identity(job).canonicalKey, application_stage: 'none', application_history: [], mark: 'saved', viewed: true, title: job.title, company: job.company,
     location: job.location, salary: null, posted: null, exported_at: when
   });
   assert.equal(metadata(output).canonical_key, 'xero|auckland|software engineer');
@@ -38,15 +38,15 @@ test('SEEK handoff has versioned metadata, existing canonical identity and norma
 });
 test('LinkedIn handoff derives numeric ID and keeps platform-specific canonical identity', () => {
   const linked = { ...job, id: undefined, platform: 'linkedin', url: 'https://www.linkedin.com/jobs/search-results/?currentJobId=4321123456&trackingId=x' };
-  const data = metadata(J.markdown(linked, { mark: 'APPLIED', viewed: false }, when));
+  const data = metadata(J.markdown(linked, { mark: 'NONE', viewed: false, applicationStage: 'APPLIED', applicationHistory: [{ stage: 'APPLIED', at: 10 }] }, when));
   assert.equal(data.platform, 'linkedin'); assert.equal(data.job_id, '4321123456');
   assert.equal(data.canonical_url, 'https://www.linkedin.com/jobs/view/4321123456/');
   assert.equal(data.canonical_key, 'linkedin|xero|auckland|software engineer');
-  assert.equal(data.mark, 'applied'); assert.equal(data.viewed, false);
+  assert.equal(data.mark, 'none'); assert.equal(data.application_stage, 'applied'); assert.deepEqual(data.application_history, [{ stage: 'APPLIED', at: 10 }]); assert.equal(data.viewed, false);
   assert.equal(J.filename(linked), 'xero-limited-software-engineer-linkedin-4321123456.md');
 });
 test('all marks and viewed values round-trip; missing optional metadata is consistently null', () => {
-  for (const mark of ['NONE', 'SKIP', 'SAVED', 'APPLIED']) for (const viewed of [true, false]) {
+  for (const mark of ['NONE', 'SKIP', 'SAVED']) for (const viewed of [true, false]) {
     const data = metadata(J.markdown(job, { mark, viewed }, when));
     assert.equal(data.mark, mark.toLowerCase()); assert.equal(data.viewed, viewed);
   }

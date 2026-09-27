@@ -11,8 +11,10 @@
     const url = S.canonicalUrl(id, platform);
     const mark = String(easySeekState.mark || 'none').toLowerCase();
     const metadata = {
-      easyseek_schema: 1, platform, job_id: optional(id), canonical_url: optional(url), canonical_key: optional(canonicalKey),
-      mark: ['none', 'skip', 'saved', 'applied'].includes(mark) ? mark : 'none', viewed: easySeekState.viewed === true,
+      easyseek_schema: 2, platform, job_id: optional(id), canonical_url: optional(url), canonical_key: optional(canonicalKey),
+      mark: ['none', 'skip', 'saved'].includes(mark) ? mark : 'none', viewed: easySeekState.viewed === true,
+      application_stage: (easySeekState.applicationStage || 'NONE').toLowerCase(),
+      application_history: easySeekState.applicationHistory || [],
       title: optional(job.title), company: optional(job.company), location: optional(job.location),
       salary: optional(job.salary), posted: optional(job.posted), exported_at: new Date(exportedAt).toISOString()
     };

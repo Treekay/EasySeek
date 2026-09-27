@@ -20,7 +20,7 @@ test('LinkedIn URLs: numeric, slug, search selection, collection, unrelated host
 });
 test('same numeric IDs and canonical titles on SEEK and LinkedIn remain separate', () => {
   let records = S.apply([], { ...job, platform: 'seek', url: 'https://nz.seek.com/job/123' }, 'SKIP', 0);
-  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: false });
+  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: false, applicationStage: 'NONE', applicationHistory: [] });
   records = S.apply(records, job, 'SAVED', 1);
   records = S.apply(records, job, 'VIEW', 2);
   assert.equal(records.length, 2);
@@ -28,7 +28,7 @@ test('same numeric IDs and canonical titles on SEEK and LinkedIn remain separate
   assert.deepEqual(records[1].linkedinIds, ['123']);
   assert.equal(records[1].seekIds, undefined);
   assert.notEqual(S.recordKey(records[0]), S.recordKey(records[1]));
-  assert.deepEqual(S.getState(records, job), { mark: 'SAVED', viewed: true });
+  assert.deepEqual(S.getState(records, job), { mark: 'SAVED', viewed: true, applicationStage: 'NONE', applicationHistory: [] });
 });
 test('LinkedIn aliases deduplicate only within platform without extending expiry', () => {
   let records = S.apply([], job, 'SKIP', 0);
@@ -43,7 +43,7 @@ test('schema 2 migration preserves all memory and old management keys', () => {
   const record = { schemaVersion: 2, canonicalKey: '', seekIds: ['123'], url: 'https://seek.co.nz/job/123', mark: 'APPLIED', markChangedAt: 100, lastViewedAt: 200, firstSeenAt: 50, lastSeenAt: 300, updatedAt: 300 };
   const migrated = S.migrate([record], 400)[0];
   assert.equal(S.recordKey(migrated), 'seek:123');
-  assert.deepEqual(migrated, { ...record, schemaVersion: 3, platform: 'seek' });
+  assert.deepEqual(migrated, { ...record, schemaVersion: 4, platform: 'seek', mark: 'NONE', savedAt: null, applicationStage: 'APPLIED', applicationStageChangedAt: 100, applicationHistory: [{ stage: 'APPLIED', at: 100 }] });
   assert.deepEqual(S.migrate([migrated], 500), [migrated]);
   assert.equal(S.getState([migrated], job).mark, 'NONE');
 });
@@ -57,7 +57,7 @@ test('LinkedIn Memory management clears marks independently and removes linked I
   let records = S.apply(S.apply([], job, 'VIEW', 1), job, 'APPLIED', 2);
   const key = S.recordKey(records[0]);
   records = S.manage(records, key, 'NONE', 3);
-  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: true });
+  assert.deepEqual(S.getState(records, job), { mark: 'NONE', viewed: true, applicationStage: 'APPLIED', applicationHistory: [{ stage: 'APPLIED', at: 2 }] });
   records = S.manage(records, key, 'REMOVE', 4);
   assert.equal(records.length, 0);
 });

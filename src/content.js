@@ -20,7 +20,7 @@
       const data = await store.request('action', { job: memoryJob(job), action });
       records = data.records;
       schedule();
-      UI.notify(action === 'NONE' ? 'Mark cleared' : 'Marked ' + action);
+      UI.notify(action === 'NONE' ? 'Mark cleared' : S.stages.includes(action) ? 'Progress: ' + action : 'Marked ' + action);
     } catch (error) { fail(error); }
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, 120); }
@@ -105,10 +105,10 @@
         const hide = S.hidden(state, preferences);
         node.classList.toggle('easyseek-hidden', hide);
         node.classList.toggle('easyseek-saved', state.mark === 'SAVED');
-        node.classList.toggle('easyseek-applied', state.mark === 'APPLIED');
+        node.classList.toggle('easyseek-applied', state.applicationStage !== 'NONE');
         if (hide) hidden++;
-        const token = JSON.stringify([job.id, S.identity(job).canonicalKey, state.mark, state.viewed]);
-        if ((state.mark !== 'NONE' || state.viewed) && !observed.has(token)) { observed.add(token); toObserve.push(memoryJob(job)); }
+        const token = JSON.stringify([job.id, S.identity(job).canonicalKey, state.mark, state.viewed, state.applicationStage]);
+        if ((state.mark !== 'NONE' || state.applicationHistory.length || state.viewed) && !observed.has(token)) { observed.add(token); toObserve.push(memoryJob(job)); }
       }
       if (!rail) rail = UI.rail({ copy, export: download, mark, filter,
         memory: () => store.request('openOptions').catch(fail) });

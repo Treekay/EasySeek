@@ -68,9 +68,11 @@
     const keys = new Set([canonicalKey, ...byId.map(r => r.canonicalKey)].filter(Boolean));
     return records.filter(r => byId.includes(r) || (r.canonicalKey && keys.has(r.canonicalKey)));
   }
-  const marks = ['NONE', 'SKIP', 'SAVED', 'APPLIED'];
+  const marks = ['NONE', 'SKIP', 'SAVED'];
+  const stages = ['NONE', 'APPLIED', 'INTERVIEW', 'OFFERED', 'REJECTED'];
+  const stageAction = action => action === 'STAGE_NONE' ? 'NONE' : stages.slice(1).includes(action) ? action : null;
   const filterKeys = ['hideSkipped', 'hideApplied', 'hideSaved', 'hideViewed'];
-  const retentionKeys = ['viewedDays', 'skipDays', 'savedDays', 'appliedDays'];
+  const retentionKeys = ['viewedDays', 'skipDays', 'savedDays'];
   const defaults = { hideSkipped: true, hideApplied: false, hideSaved: false, hideViewed: false,
     viewedDays: 60, skipDays: 60, savedDays: null, appliedDays: null };
   const validDays = value => value === null || (Number.isSafeInteger(value) && value > 0 && value <= 36500);
@@ -86,37 +88,67 @@
   const timestamp = value => Number.isFinite(value) && value >= 0;
   function migrate(records, now = Date.now()) {
     return records.map(record => {
-      if (record.schemaVersion === 3) return record;
-      if (record.schemaVersion === 2) return { ...record, schemaVersion: 3, platform: 'seek' };
-      const assigned = [record.statusChangedAt,
-        ...(['SKIP', 'PURSUE'].includes(record.status) && record.manualAt > 0 ? [record.manualAt] : []),
-        record.updatedAt, record.lastSeenAt, record.firstSeenAt].find(timestamp) ?? now;
-      const { status, statusChangedAt, manualAt, ...metadata } = record;
-      return { ...metadata, schemaVersion: 3, platform: 'seek',
-        url: canonicalUrl(record.seekIds[0]),
-        mark: status === 'PURSUE' ? 'SAVED' : status === 'SKIP' ? 'SKIP' : 'NONE',
-        markChangedAt: ['PURSUE', 'SKIP'].includes(status) ? assigned : null,
-        // V1 did not distinguish viewing a marked job from observing its card.
-        lastViewedAt: status === 'SEEN' ? assigned : null
-      };
+      if (record.schemaVersion >= 4) return record;
+      let next = record;
+      if (record.schemaVersion !== 2 && record.schemaVersion !== 3) {
+        const assigned = [record.statusChangedAt,
+          ...(['SKIP', 'PURSUE'].includes(record.status) && record.manualAt > 0 ? [record.manualAt] : []),
+          record.updatedAt, record.lastSeenAt, record.firstSeenAt].find(timestamp) ?? now;
+        const { status, statusChangedAt, manualAt, ...metadata } = record;
+        next = { ...metadata, platform: 'seek', url: canonicalUrl(record.seekIds?.[0]),
+          mark: status === 'PURSUE' ? 'SAVED' : status === 'SKIP' ? 'SKIP' : 'NONE',
+          markChangedAt: ['PURSUE', 'SKIP'].includes(status) ? assigned : null,
+          lastViewedAt: status === 'SEEN' ? assigned : null };
+      }
+      const applied = next.mark === 'APPLIED';
+      const at = [next.markChangedAt, next.updatedAt, next.lastSeenAt, next.firstSeenAt].find(timestamp) ?? now;
+      return { ...next, schemaVersion: 4, platform: next.platform || 'seek',
+        mark: applied ? 'NONE' : next.mark,
+        savedAt: next.savedAt ?? (next.mark === 'SAVED' ? at : null),
+        applicationStage: applied ? 'APPLIED' : 'NONE', applicationStageChangedAt: applied ? at : null,
+        applicationHistory: applied ? [{ stage: 'APPLIED', at }] : [] };
     });
+  }
+  function history(records) {
+    if (records.length === 1) return (records[0].applicationHistory || []).map(event => ({ ...event }));
+    const merged = [], counts = new Map();
+    for (const record of records) {
+      const local = new Map();
+      for (const event of record.applicationHistory || []) {
+        const key = JSON.stringify([event.stage, event.at]);
+        const occurrence = (local.get(key) || 0) + 1; local.set(key, occurrence);
+        if (occurrence > (counts.get(key) || 0)) { merged.push({ ...event }); counts.set(key, occurrence); }
+      }
+    }
+    // Preserve same-millisecond cycles within a record while coalescing copied
+    // events from canonical aliases. Stable sorting preserves their event order.
+    return merged.sort((a, b) => a.at - b.at);
+  }
+
+  function application(records) {
+    const events = history(records);
+    const latest = events.at(-1);
+    return { applicationStage: latest?.stage || 'NONE', applicationHistory: events };
+  }
+  function retained(record) {
+    return record.mark !== 'NONE' || timestamp(record.lastViewedAt) || record.applicationStage !== 'NONE' || record.applicationHistory.length > 0;
   }
   function winner(records) {
     return [...records].sort((a, b) => (b.markChangedAt ?? -1) - (a.markChangedAt ?? -1) || b.updatedAt - a.updatedAt)[0];
   }
   function getState(records, job) {
-    const found = matches(records, job);
-    return { mark: winner(found)?.mark || 'NONE', viewed: found.some(record => timestamp(record.lastViewedAt)) };
+    const found = matches(migrate(records), job);
+    return { mark: winner(found)?.mark || 'NONE', viewed: found.some(record => timestamp(record.lastViewedAt)), ...application(found) };
   }
   function hidden(state, settings) {
     const prefs = preferences(settings);
     return ((state.mark === 'SKIP' && prefs.hideSkipped) ||
-      (state.mark === 'SAVED' && prefs.hideSaved) || (state.mark === 'APPLIED' && prefs.hideApplied) ||
+      (state.mark === 'SAVED' && prefs.hideSaved) || (state.applicationStage && state.applicationStage !== 'NONE' && prefs.hideApplied) ||
       (state.viewed && prefs.hideViewed));
   }
   function expiresAt(record, settings = {}) {
     const prefs = preferences(settings);
-    const days = { SKIP: prefs.skipDays, SAVED: prefs.savedDays, APPLIED: prefs.appliedDays }[record.mark];
+    const days = { SKIP: prefs.skipDays, SAVED: prefs.savedDays }[record.mark];
     return {
       mark: record.mark === 'NONE' || days == null ? null : record.markChangedAt + days * DAY,
       viewed: !timestamp(record.lastViewedAt) || prefs.viewedDays === null ? null : record.lastViewedAt + prefs.viewedDays * DAY
@@ -129,18 +161,29 @@
       if (expiry.mark !== null && now >= expiry.mark) next.mark = 'NONE';
       if (expiry.viewed !== null && now >= expiry.viewed) next.lastViewedAt = null;
       return next;
-    }).filter(record => record.mark !== 'NONE' || timestamp(record.lastViewedAt));
+    }).filter(retained);
+  }
+  function change(record, action, now) {
+    const stage = stageAction(action);
+    if (stage !== null) {
+      if (record.applicationStage === stage) return record;
+      return { ...record, applicationStage: stage, applicationStageChangedAt: now, updatedAt: now,
+        applicationHistory: [...record.applicationHistory, { stage, at: now }] };
+    }
+    if (!marks.includes(action)) throw new Error('Invalid mark');
+    return { ...record, mark: action, markChangedAt: now, updatedAt: now,
+      savedAt: action === 'SAVED' ? record.savedAt ?? now : record.savedAt };
   }
   function manage(records, key, action, now = Date.now()) {
+    records = migrate(records, now);
     const record = records.find(item => recordKey(item) === key);
     if (!record) throw new Error('This record no longer exists. Refresh the list.');
     if (action === 'REMOVE') return records.filter(item => item !== record);
-    if (!marks.includes(action)) throw new Error('Invalid mark');
-    return records.map(item => item === record ? { ...item, mark: action, markChangedAt: now, updatedAt: now } : item)
-      .filter(item => item.mark !== 'NONE' || timestamp(item.lastViewedAt));
+    return records.map(item => item === record ? change(item, action, now) : item).filter(retained);
   }
   function apply(records, job, action, now = Date.now()) {
-    if (!marks.includes(action) && !['VIEW', 'OBSERVE'].includes(action)) throw new Error('Invalid action');
+    if (!marks.includes(action) && stageAction(action) === null && !['VIEW', 'OBSERVE'].includes(action)) throw new Error('Invalid action');
+    records = migrate(records, now);
     const ident = identity(job);
     if (!ident.key) return records;
     const found = matches(records, job);
@@ -149,21 +192,23 @@
     const rest = records.filter(record => !found.includes(record));
     const automatic = action === 'VIEW' || action === 'OBSERVE';
     const viewedTimes = found.map(record => record.lastViewedAt).filter(timestamp);
-    const record = {
-      schemaVersion: 3, platform: ident.platform, canonicalKey: old?.canonicalKey || ident.canonicalKey,
+    let record = {
+      schemaVersion: 4, platform: ident.platform, canonicalKey: old?.canonicalKey || ident.canonicalKey,
       [ident.platform === 'linkedin' ? 'linkedinIds' : 'seekIds']: [...new Set([...found.flatMap(recordIds), ident.id].filter(Boolean))],
       title: job.title || old?.title || '', company: job.company || old?.company || '',
-      city: city(job.location) || old?.city || '',
+      city: city(job.location) || old?.city || '', location: job.location || old?.location || old?.city || '',
       url: canonicalUrl(ident.id, ident.platform) || old?.url || '',
-      mark: automatic ? old?.mark || 'NONE' : action,
-      markChangedAt: automatic ? old?.markChangedAt ?? null : now,
+      mark: old?.mark || 'NONE', markChangedAt: old?.markChangedAt ?? null,
+      savedAt: found.some(r => timestamp(r.savedAt)) ? Math.min(...found.map(r => r.savedAt).filter(timestamp)) : null,
+      ...application(found), applicationStageChangedAt: history(found).at(-1)?.at ?? null,
       lastViewedAt: action === 'VIEW' ? now : viewedTimes.length ? Math.max(...viewedTimes) : null,
       firstSeenAt: found.length ? Math.min(...found.map(record => record.firstSeenAt)) : now,
       lastSeenAt: now, updatedAt: now
     };
-    return record.mark !== 'NONE' || timestamp(record.lastViewedAt) ? [...rest, record] : rest;
+    if (!automatic) record = change(record, action, now);
+    return retained(record) ? [...rest, record] : rest;
   }
   root.EasySeekState = { DAY, linkedinOrigins, isLinkedInUrl, isLinkedInJobsUrl, isSupportedPage, platformOf, linkedinJobId, recordIds, seekOrigins, canonicalOrigin, isSeekUrl, canonicalUrl, normalize, company, city, jobId, identity, matches, getState, hidden, cleanup, apply,
-    marks, filterKeys, retentionKeys, defaults, preferences, validDays, recordKey, migrate, expiresAt, manage };
+    stages, history, marks, filterKeys, retentionKeys, defaults, preferences, validDays, recordKey, migrate, expiresAt, manage };
   if (typeof module !== 'undefined') module.exports = root.EasySeekState;
 })(globalThis);

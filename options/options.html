@@ -3,28 +3,30 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EasySeek Memory</title><link rel="icon" type="image/png" href="../icons/icon-32.png"><link rel="stylesheet" href="options.css">
-  <script defer src="../src/state.js"></script><script defer src="../src/storage.js"></script><script defer src="options.js"></script>
+  <script defer src="../src/state.js"></script><script defer src="../src/storage.js"></script><script defer src="../src/applications.js"></script><script defer src="options.js"></script>
 </head>
 <body><main>
-  <header><h1>EasySeek Memory</h1><p>Your viewed jobs and marks, stored only in this Chrome profile.</p></header>
+  <header><h1>EasySeek Memory</h1><p>Your browsing memory and application progress, stored only in this Chrome profile.</p></header>
   <p id="feedback" role="status" aria-live="polite">Loading…</p>
   <section aria-labelledby="memory-heading">
     <h2 id="memory-heading">Memory</h2>
     <div class="toolbar">
       <label>Search title or company<input id="search" type="search" placeholder="Search remembered jobs"></label>
-      <label>Mark<select id="filter"><option value="">All marks</option><option>NONE</option><option>SKIP</option><option>SAVED</option><option>APPLIED</option></select></label>
+      <label>View<select id="view"><option value="">All memory</option><option value="applications">Applications &amp; saved</option></select></label>
+      <label>Mark / Stage<select id="filter"><option value="">All marks / stages</option><option>NONE</option><option>SKIP</option><option>SAVED</option><option>APPLIED</option><option>INTERVIEW</option><option>OFFERED</option><option>REJECTED</option></select></label>
       <label>Viewed<select id="viewedFilter"><option value="">All jobs</option><option value="yes">Viewed</option><option value="no">Not viewed</option></select></label>
+      <button id="exportApplications" type="button">Export applications CSV</button>
       <button id="refresh" type="button">Refresh</button>
-    </div><p id="count"></p><div id="records"></div>
+    </div><p class="hint">CSV includes all saved jobs and current applications, regardless of the filters above.</p><p id="count"></p><div id="records"></div>
   </section>
   <section aria-labelledby="settings-heading">
     <h2 id="settings-heading">Settings</h2>
-    <p>Viewed history and user marks are independent. Opening a job never changes its mark. Search appearances never extend retention.</p>
+    <p>Viewed history, browsing marks and application stages are independent. Opening a job never changes its mark or progress. Search appearances never extend retention.</p>
     <form id="settings">
       <h3>Memory duration</h3><div id="retention" class="toolbar"></div>
-      <p class="hint">Marks expire from their marked date; viewed history expires from the last actual opening. Expiry clears only that part of memory. Records disappear when neither part remains.</p>
+      <p class="hint">Marks expire from their marked date; viewed history expires from the last actual opening. Expiry clears only that part of memory. Application stages and their event history never expire automatically. Records with application history remain until you explicitly remove them.</p>
       <h3>Show in search results</h3><div id="filters" class="toolbar"></div>
-      <p class="hint">Select the types of jobs to show. Unselected types are hidden; a viewed job with a mark needs both selected. Select all four to show everything.</p>
+      <p class="hint">Select the types of jobs to show. Unselected types are hidden; a viewed job with a mark needs both selected. Applications includes Applied, Interview, Offered and Rejected. Select all four to show everything.</p>
       <button type="submit">Save settings</button>
     </form>
   </section>

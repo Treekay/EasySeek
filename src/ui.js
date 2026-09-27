@@ -53,14 +53,18 @@
       }
       node.append(row);
     }
-    for (const [label, mark] of [['Skip', 'SKIP'], ['Saved', 'SAVED'], ['Applied', 'APPLIED']]) {
+    for (const [label, mark] of [['Skip', 'SKIP'], ['Saved', 'SAVED'], ['Applied', 'APPLIED'], ['Interview', 'INTERVIEW'], ['Offered', 'OFFERED'], ['Rejected', 'REJECTED']]) {
       const choice = button(label, 'mark-' + mark, () => { close(true); handlers.mark(mark); });
       choice.dataset.mark = mark; choices[mark] = choice; panels.mark.append(choice);
     }
+    const progressLabel = element('span', '', 'easyseek-progress-label');
+    panels.mark.prepend(progressLabel);
+    const stageBadge = element('span', '', 'easyseek-stage-badge');
+    buttons.mark.append(stageBadge);
     const filterRow = element('div', '', 'easyseek-filter-toggles');
-    for (const [key, label] of [['hideSkipped', 'Skip'], ['hideApplied', 'Applied'], ['hideSaved', 'Saved'], ['hideViewed', 'Viewed']]) {
+    for (const [key, label] of [['hideSkipped', 'Skip'], ['hideApplied', 'Apps'], ['hideSaved', 'Saved'], ['hideViewed', 'Viewed']]) {
       toggles[key] = button(label, key, () => handlers.filter(key, !settings[key]));
-      toggles[key].title = 'Show ' + label + ' jobs';
+      toggles[key].title = key === 'hideApplied' ? 'Show all application stages' : 'Show ' + label + ' jobs';
       toggles[key].setAttribute('aria-label', 'Show ' + label + ' jobs');
       toggles[key].dataset.filter = key; filterRow.append(toggles[key]);
     }
@@ -75,10 +79,14 @@
       for (const key of ['copy', 'export', 'mark']) buttons[key].disabled = !detail;
       settings = { ...preferences };
       buttons.mark.dataset.mark = state.mark;
-      buttons.mark.title = detail ? `${detail.title} — ${state.mark}${state.viewed ? ' · Viewed' : ''}` : 'Open a job to mark it';
-      buttons.mark.setAttribute('aria-label', detail ? 'Change job mark: ' + state.mark : 'Open a job to mark it');
+      const stage = state.applicationStage || 'NONE';
+      buttons.mark.dataset.stage = stage;
+      stageBadge.textContent = stage === 'NONE' ? '' : { APPLIED: 'A', INTERVIEW: 'I', OFFERED: 'O', REJECTED: 'R' }[stage];
+      progressLabel.textContent = stage === 'NONE' ? 'Mark / Progress' : 'Progress: ' + stage.toLowerCase();
+      buttons.mark.title = detail ? `${detail.title} — ${state.mark} · ${stage}${state.viewed ? ' · Viewed' : ''}` : 'Open a job to mark it';
+      buttons.mark.setAttribute('aria-label', detail ? 'Change job mark and progress: ' + state.mark + ', ' + stage : 'Open a job to mark it');
       buttons.filter.title = `${shown} jobs shown · ${hidden} hidden`;
-      for (const [mark, choice] of Object.entries(choices)) choice.setAttribute('aria-pressed', String(state.mark === mark));
+      for (const [mark, choice] of Object.entries(choices)) choice.setAttribute('aria-pressed', String(['SKIP', 'SAVED'].includes(mark) ? state.mark === mark : stage === mark));
       for (const [key, choice] of Object.entries(toggles)) choice.setAttribute('aria-pressed', String(!settings[key]));
     } };
   }

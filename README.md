@@ -1,8 +1,8 @@
 # EasySeek V1
 
-A lightweight Manifest V3 Chrome extension for SEEK New Zealand and LinkedIn Jobs browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved**, **Applied**, or **Skip**, while keeping each site's own search and detail UI.
+A lightweight Manifest V3 Chrome extension for SEEK New Zealand and LinkedIn Jobs browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved** or **Skip**, and track **Applied / Interview / Offered / Rejected**, while keeping each site's own search and detail UI.
 
-Plain JavaScript and CSS, no build step or dependencies. All data stays in `chrome.storage.local` in this Chrome profile. No backend, accounts, cloud sync, analytics, network requests, crawling, application automation, or messages. Full job descriptions are never stored in extension memory. Copy JD and .md download are generated only on request from the current page. There is no Career Ops integration, JSON/CSV memory export, or sync.
+Plain JavaScript and CSS, no build step or dependencies. All data stays in `chrome.storage.local` in this Chrome profile. No backend, accounts, cloud sync, analytics, network requests, crawling, application automation, or messages. Full job descriptions are never stored in extension memory. Copy JD and .md download are generated only on request from the current page. Memory offers an explicit local applications CSV download. There is no Career Ops integration, JSON export, sync, automated analysis, or Sankey diagram.
 
 ## Install or update
 
@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.5.0** adds versioned YAML metadata to both Copy JD and Export JD, including canonical identity and current EasySeek mark/viewed state. Filenames now include the source platform. Reload the extension and your SEEK/LinkedIn tabs after updating.
+Version **1.6.0** separates browsing marks from application progress, keeps stage event history, and adds an Applications view and local CSV export in Memory. Stored records migrate to schema 4; JD Markdown uses handoff schema 2. Reload the extension, job tabs and Memory after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -20,17 +20,19 @@ Newly recorded or observed jobs use `https://nz.seek.com/job/{id}` as their cano
 
 ## Structured Markdown handoff
 
-Copy JD and Export JD use the same formatter and produce the same UTF-8 Markdown for an unchanged active job and EasySeek state. Each click re-extracts the currently rendered JD and reads the tab's current EasySeek state. The YAML front matter uses schema version 1, followed by a human-readable title, `## Job` metadata, and `## Job Description` with the full extracted text.
+Copy JD and Export JD use the same formatter and produce the same UTF-8 Markdown for an unchanged active job and EasySeek state. Each click re-extracts the currently rendered JD and reads the tab's current EasySeek state. The YAML front matter uses schema version 2, followed by a human-readable title, `## Job` metadata, and `## Job Description` with the full extracted text.
 
 ```yaml
 ---
-easyseek_schema: 1
+easyseek_schema: 2
 platform: "seek"
 job_id: "12345678"
 canonical_url: "https://nz.seek.com/job/12345678"
 canonical_key: "xero|auckland|software engineer"
 mark: "saved"
 viewed: true
+application_stage: "none"
+application_history: []
 title: "Software Engineer"
 company: "Xero"
 location: "Auckland"
@@ -42,7 +44,7 @@ exported_at: "2026-09-27T01:02:03.000Z"
 
 - `platform` is `seek` or `linkedin`; `job_id` is a string containing the platform's numeric ID. `canonical_url` uses the existing normalized URL without tracking parameters.
 - `canonical_key` reuses EasySeek's canonical identity logic, including the `linkedin|` prefix. It is `null` when there is insufficient metadata for a canonical key; consumers can use platform plus job ID instead.
-- `mark` is `none`, `skip`, `saved`, or `applied`. `viewed` is a YAML boolean. These describe local EasySeek state, independently of native site marks.
+- `mark` is `none`, `skip`, or `saved`. `application_stage` is `none`, `applied`, `interview`, `offered`, or `rejected`; `application_history` is the ordered list of stored `{stage, at}` events (uppercase stage names, Unix milliseconds). Schema 2 replaces schema 1's `mark: applied` with this independent stage. `viewed` is a YAML boolean. These describe local EasySeek state, independently of native site marks.
 - `title`, `company`, `location`, `salary`, and `posted` contain extracted text; missing/blank values are consistently `null`. All strings are double-quoted with escaped quotes, backslashes and newlines. Human-readable missing fields say “Not available”.
 - `exported_at` is an ISO 8601 UTC timestamp for the generated snapshot. The tab reuses that timestamp while the job content and state remain unchanged, ensuring Copy and Export are byte-identical. A changed job/content/state or navigation creates a fresh timestamp on the next explicit handoff. The formatter accepts an explicit timestamp for reproducible output.
 
@@ -50,12 +52,14 @@ Download names retain bounded, sanitized slugs: `company-title-platform-jobId.md
 
 This is a portable handoff for external tools or agents, including career-ops; no tool is required or directly integrated. EasySeek does not send the output anywhere, perform analysis, call APIs or synchronize data. Copy and download are explicit and local. They do not change marks, Viewed history or retention timestamps, and never persist the JD to `chrome.storage`. Only transient in-tab snapshot information is kept for consistent output.
 
-## Viewed history and user marks
+## Viewed history, browsing marks and application progress
 
 These are independent concepts:
 
 - **Viewed** means a detail page successfully rendered a title and description. Opening it updates `lastViewedAt`; encountering a search card does not count as viewing.
-- **Mark** is your explicit decision: NONE, SKIP, SAVED, or APPLIED. Opening or observing the job never overwrites the mark or its timestamp.
+- **Mark** is your browsing decision: NONE, SKIP or SAVED. Opening or observing never overwrites it or its timestamp. Saved is a pre-application decision and may coexist with an application stage.
+- **Application stage** is NONE, APPLIED, INTERVIEW, OFFERED or REJECTED. Each change appends `{stage, at}`; choosing the same current stage again adds no event. Arbitrary paths are allowed: direct rejection, interview then rejection/offer, returning to an earlier stage, or starting directly at Interview. No missing stages are inferred.
+- Changing marks or viewing never changes application history. Memory's **No current stage** records a NONE event and preserves history; only **Remove record** deletes it. History survives reloads/restarts and never expires automatically. Canonical aliases merge their histories within the same platform.
 
 ## Floating action rail
 
@@ -63,7 +67,7 @@ The right-middle edge of the viewport has five compact, fixed 40 × 40 px square
 
 - **Copy JD** (blue) copies the active job as structured Markdown and shows “Copied” after success.
 - **Export JD** (green download icon) downloads the same Markdown as `company-title-platform-jobId.md`.
-- **Mark** opens three equal-sized buttons to its left: **Skip / Saved / Applied**. Selecting one closes the menu. The pencil icon color and tooltip reflect the current mark; its tooltip also shows whether the job was viewed. Saved and Applied cards retain subtle outlines.
+- **Mark** opens a compact 3 × 2 grid of square buttons: **Skip / Saved / Applied / Interview / Offered / Rejected**. Selecting one closes it. The current stage appears in the submenu and tooltip; the pencil button has an A/I/O/R stage indicator. Browsing marks and stage selections highlight independently. Saved and application cards retain subtle outlines.
 - **Filter** opens four independent toggle buttons to its left. Selected toggles have a blue state and a check: they indicate which types of jobs are shown. This menu stays open for repeated changes; Escape, clicking outside, or clicking Filter again closes it. The Filter tooltip reports loaded cards shown/hidden.
 
 **Memory** is the fifth main button (gear icon). It opens the management page directly in a new tab, including when no job detail is active.
@@ -72,18 +76,18 @@ The rail acts on a full detail page or the active split-view detail pane. Withou
 
 Copy/download include title, company, location, salary, posted date/age, canonical URL, platform-specific job ID, and the full visible description. Missing fields say “Not available.” Description paragraphs remain plain text inside structured Markdown. Expand any collapsed job description on the site first. Filenames remove filesystem-unsafe characters. Downloads use a temporary local Blob URL, without the downloads permission or a network request; Chrome chooses the destination according to your download settings. “Download started” confirms handoff to Chrome, not that the file has finished saving. Clipboard failures show an error rather than a success message.
 
-**Clear mark** in Memory returns to NONE and preserves any unexpired viewed history. **Remove record** in Memory deletes both the mark and viewed history, including all linked listing IDs. If clearing a mark leaves no viewed history, the empty record is discarded. Selecting a mark again is a new manual decision and restarts its mark retention timer.
+**Clear mark** in Memory returns to NONE and preserves any unexpired viewed history. **Remove record** in Memory deletes marks, application history and viewed history, including all linked listing IDs. If clearing a mark leaves neither viewed nor application history, the empty record is discarded. Selecting a mark again is a new manual decision and restarts its mark retention timer.
 
 ## Search filters
 
 | Filter | Default |
 | --- | --- |
 | Skip | Not selected (hidden) |
-| Applied | Selected (shown) |
+| Applications (Apps) | Selected (shown) |
 | Saved | Selected (shown) |
 | Viewed | Selected (shown) |
 
-All four can be changed through the floating Filter menu or Memory settings. Select the types you want to see; deselect to hide them. These remain independent: a viewed Saved job requires both Viewed and Saved to be selected. New, unmarked jobs always remain visible. Select all four to recover every hidden job; the separate Show Hidden override has been removed. Selections persist across pages and tabs. Existing preferences keep their filtering effect; only the UI meaning is inverted, so no data migration is needed. Internally the existing `hide*` preference keys are retained for compatibility. The Filter tooltip counts currently loaded cards, not total SEEK matches or unique opportunities.
+All four can be changed through the floating Filter menu or Memory settings. Select the types you want to see; deselect to hide them. These remain independent: a viewed Saved job requires both Viewed and Saved to be selected. Applications covers all four current application stages using the existing `hideApplied` preference. New jobs with no mark, stage or viewed history remain visible. Select all four to recover every hidden job; the separate Show Hidden override has been removed. Selections persist across pages and tabs. Existing preferences keep their filtering effect; only the UI meaning is inverted, so no data migration is needed. Internally the existing `hide*` preference keys are retained for compatibility. The Filter tooltip counts currently loaded cards, not total SEEK matches or unique opportunities.
 
 Filtering uses reversible CSS classes, never removes site nodes. Settings and record changes propagate to other open job tabs through storage events. A single background writer serializes updates from all tabs.
 
@@ -94,11 +98,11 @@ Filtering uses reversible CSS classes, never removes site nodes. Settings and re
 | Viewed | 60 days | `lastViewedAt`: last actual detail opening |
 | Skip | 60 days | `markChangedAt`: explicit mark assignment |
 | Saved | Never | `markChangedAt` if configured finite |
-| Applied | Never | `markChangedAt` if configured finite |
+| Applied / Interview / Offered / Rejected and all application history | Never (not configurable) | No automatic expiry |
 
-Each policy independently offers **30 / 60 / 90 / 180 days / Never** in Memory settings. Expiry is the anchor plus the selected number of 24-hour days, inclusive of the expiry boundary. Repeated search appearances, observations in another tab, and discovered listing aliases do not extend either timer. Reopening a detail refreshes viewed history only, never the mark timer.
+Viewed, Skip and Saved each independently offer **30 / 60 / 90 / 180 days / Never** in Memory settings. Expiry is the anchor plus the selected number of 24-hour days, inclusive of the expiry boundary. Repeated search appearances, observations in another tab, and discovered listing aliases do not extend either timer. Reopening a detail refreshes viewed history only, never the mark timer.
 
-Cleanup clears only the expired part. An expired Skip mark becomes NONE while recent viewed history remains. Expired viewed history does not remove an unexpired Saved/Applied/Skip mark. The record is deleted only when neither a mark nor viewed history remains. Settings changes do not rewrite timestamps and affect the next cleanup, including cleanup performed when saving them. Shortening retention requires confirmation because it may immediately discard older memory. Extending a policy cannot recover information already removed.
+Cleanup clears only the expired part. An expired Skip mark becomes NONE while recent viewed history remains. Expired viewed or Skip memory never removes application history. The record is deleted only when no mark, viewed history, stage or application history remains. The old finite `appliedDays` setting is retired and normalized to Never; even previously finite Applied records migrate before cleanup. Settings changes do not rewrite timestamps and affect the next cleanup, including cleanup performed when saving them. Shortening retention requires confirmation because it may immediately discard older memory. Extending a policy cannot recover information already removed.
 
 Cleanup is opportunistic on background requests, including job-page load/pageshow, Memory opening/Refresh, and Clear expired memory. No scheduled task is installed; an idle tab need not update at the exact expiry instant.
 
@@ -106,19 +110,32 @@ Cleanup is opportunistic on background requests, including job-page load/pagesho
 
 Open **chrome://extensions → EasySeek → Details → Extension options**, or click **Memory (gear icon)** in the floating rail.
 
-- Inspect every remembered opportunity: title, company, city, mark, marked date, mark expiry, last viewed date, viewed expiry, and linked platform-specific listing IDs.
-- Search title/company and combine a mark filter (including NONE) with Viewed/Not viewed. No marked date/expiry is shown for NONE; no viewed date is shown when viewing is unknown or expired.
+- Inspect every remembered opportunity: title, company, location, platform, source URL, mark, mark/view expiry, stage and linked listing IDs. Application rows show first Applied/Interview/Offered/Rejected dates and an expandable full event history.
+- Choose **Applications & saved** to omit Viewed/Skip-only memory, then filter Saved, Applied, Interview, Offered or Rejected. Search title/company and combine mark/stage filters with Viewed/Not viewed. No marked date/expiry is shown for NONE; no viewed date is shown when viewing is unknown or expired.
 - Choose a mark and **Apply**, including Clear mark. This changes only the explicit decision; it does not manufacture a viewing event.
+- Set **Application stage** and click **Update progress**; No current stage preserves past events.
 - **Remove record** deletes all memory for the opportunity after confirmation.
-- Configure the four retention policies and search filters independently.
-- **Clear expired memory now** requires confirmation and preserves all unexpired information. Saved/Applied can expire only if you explicitly configure a finite policy for them. There is no bulk-delete Saved/Applied action.
+- Configure the three browsing retention policies and search filters independently.
+- **Clear expired memory now** requires confirmation and preserves all unexpired information. Saved can expire if configured finite; applications never expire automatically. There is no bulk-delete applications action.
 
-The default ordering is most recently changed mark first, using the last-viewed date for records without a mark-change date. Storage uses this Chrome profile only, not Chrome Sync. Uninstalling the extension removes its local memory.
+Records are sorted by latest mark change, stage change or view. Storage uses this Chrome profile only, not Chrome Sync. Uninstalling the extension removes its local memory.
+
+## Applications CSV
+
+**Export applications CSV** in Memory downloads `easyseek-applications-YYYY-MM-DD.csv` (UTC date). It includes all currently Saved jobs and all jobs whose current application stage is Applied, Interview, Offered or Rejected, independently of the screen's search/filter. Viewed/Skip-only records are excluded. A record reset to stage NONE stays in Memory with its history, but is exported only if still Saved.
+
+Columns: Platform, Job ID, Title, Company, Location, URL, Saved At, Current Stage, Applied At, Interview At, Offered At, Rejected At, First Seen At, Last Viewed At, Application History, Linked Job IDs.
+
+Dates use ISO 8601 UTC, with blank cells for unknown dates. Saved At is the first known Saved assignment; each stage date is its first recorded occurrence. **Application History** contains the full ordered JSON event list, so repeat applications, reversals and different funnel paths remain reconstructable; the date columns alone do not encode event order. Linked Job IDs contains the platform-specific alias IDs as JSON. No stage or timestamp is inferred from a later event.
+
+CSV uses UTF-8 BOM and CRLF rows for Excel, quotes every cell, doubles embedded quotes and preserves commas/newlines. Potential spreadsheet formulas are prefixed with an apostrophe. There is no XLSX dependency. Downloading does not alter records, timestamps or history, send data anywhere, or store a JD. No chart or automatic downstream integration is implemented.
 
 ## Migration from earlier V1 versions
 
 Migration is automatic and idempotent:
 
+- Schema 2/3 APPLIED → browsing mark NONE plus stage APPLIED and one history event, using `markChangedAt` (including zero), then `updatedAt`, `lastSeenAt`, `firstSeenAt`, or migration time. Existing timestamps and IDs remain intact. Schema 4 migrations are idempotent.
+- Existing SAVED, SKIP and Viewed records retain their state; Saved records gain their best known Saved date.
 - PURSUE → SAVED, preserving the original decision date.
 - SKIP → SKIP, preserving the original decision date.
 - SEEN → NONE with viewed history, using the old status assignment timestamp as the best known viewing time.
@@ -126,7 +143,7 @@ Migration is automatic and idempotent:
 
 Old SKIP/PURSUE records cannot reliably tell whether you opened the detail or merely saw a card. Migration does not invent viewed history for these records. Identity, linked IDs, title/company/city and observation timestamps are preserved. Missing new fields alone do not cause deletion; cleanup runs after migration under the current policies.
 
-Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old Hide Seen behavior is retired: Viewed starts selected (shown). Existing Skip visibility preference is retained. New Saved/Applied retention defaults to Never and their visibility controls start selected.
+Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old Hide Seen behavior is retired: Viewed starts selected (shown). Existing Skip visibility preference is retained. Saved retention defaults to Never; application retention is always Never. Their visibility controls start selected.
 
 ## Identity and schema
 
@@ -134,29 +151,32 @@ SEEK IDs come from `/job/12345678`; query/tracking parameters are ignored. Compl
 
 Only explicitly recognized city names are collapsed. Unknown/missing location or company does not form a partial fallback key; use the SEEK ID instead. Within the same platform, identical complete canonical keys intentionally share memory, even if SEEK issued another ID. This heuristic cannot distinguish separate vacancies with identical company/city/title.
 
-The versioned, plain-data record schema is suitable for a later JSON/CSV exporter without storing job descriptions:
+The versioned, plain-data record schema is used by the local applications CSV exporter without storing job descriptions:
 
 ```text
-schemaVersion: 3
+schemaVersion: 4
 platform: seek | linkedin
 canonicalKey: string (LinkedIn keys are prefixed with linkedin|)
 seekIds: string[] (SEEK records)
 linkedinIds: string[] (LinkedIn records)
 url: canonical job URL (no tracking parameters), or empty when no ID exists
-title, company, city: strings
-mark: NONE | SKIP | SAVED | APPLIED
-markChangedAt: Unix milliseconds or null
+title, company, city, location: strings (older records may lack location)
+mark: NONE | SKIP | SAVED
+markChangedAt, savedAt: Unix milliseconds or null
+applicationStage: NONE | APPLIED | INTERVIEW | OFFERED | REJECTED
+applicationStageChangedAt: Unix milliseconds or null
+applicationHistory: ordered {stage, at: Unix milliseconds}[]
 lastViewedAt: Unix milliseconds or null
 firstSeenAt, lastSeenAt, updatedAt: Unix milliseconds
 ```
 
-Viewed state is derived from a non-null `lastViewedAt`. `lastSeenAt` is observation metadata, never a retention anchor. Clearing/expiring a mark may retain its historical `markChangedAt` while viewed memory remains; NONE has no active mark expiry. Only the current visible JD can be copied/downloaded as Markdown. Bulk memory export, JSON/CSV export, sync integrations, and external tool calls are not implemented.
+Viewed state is derived from a non-null `lastViewedAt`. `lastSeenAt` is observation metadata, never a retention anchor. Clearing/expiring a mark may retain its historical `markChangedAt` while viewed memory remains; NONE has no active mark expiry. Only the current visible JD can be copied/downloaded as Markdown. Application CSV export is available in Memory; all-memory JSON export, sync integrations, and external tool calls are not implemented.
 
 ## Source and DOM maintenance
 
 | File | Responsibility |
 | --- | --- |
-| `src/state.js` | Identity, schema migration, independent marks/views, filters and expiry. |
+| `src/state.js` | Identity, schema migration, independent marks/views, application event history, filters and expiry. |
 | `src/background.js` | Serialized local storage writes and cleanup. |
 | `src/storage.js` | Content/options messaging client. |
 | `src/seek-extractor.js` | Centralized SEEK selectors and card/detail recognition. |
@@ -164,6 +184,7 @@ Viewed state is derived from a non-null `lastViewedAt`. `lastSeenAt` is observat
 | `src/content.js` | Navigation, dynamic cards, filtering, automatic views. |
 | `src/ui.js`, `src/styles.css` | Fixed floating rail, left-opening menus and feedback. |
 | `src/jd.js` | Shared Markdown generation, safe filenames and temporary Blob downloads. |
+| `src/applications.js` | Application stage dates, CSV formatting and explicit local download. |
 | `options/` | Memory management and settings. |
 
 Cards are recognized through `/job/{ID}` links inside semantic `article` elements or known job-card markers. A candidate must contain only one distinct job ID. Title/company/location use centralized `data-automation`/`data-testid` selectors and semantic heading links.
@@ -175,22 +196,22 @@ A debounced MutationObserver handles inserted/recycled cards and changed text/li
 ## Tests and Chrome checklist
 
 ```powershell
-node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs tests/linkedin.test.cjs
+node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs tests/linkedin.test.cjs tests/applications.test.cjs
 Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
-`tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, positive visibility filters, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
+`tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, positive visibility filters, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, browsing retention, application management/CSV export, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
-Verified: 35 Node tests, JavaScript syntax checks, and four headless Chrome fixtures (SEEK, legacy LinkedIn, SDUI LinkedIn, Memory). The LinkedIn extractor also passed a local Chrome check against freshly retrieved public HTML: 60 result cards and one full detail with company/location/description. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
+Verified: 43 Node tests, JavaScript syntax checks, and four headless Chrome fixtures (SEEK, legacy LinkedIn, SDUI LinkedIn, Memory). The LinkedIn extractor also passed a local Chrome check against freshly retrieved public HTML: 60 result cards and one full detail with company/location/description. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
-1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/Export JD/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm Skip is unselected and Applied/Saved/Viewed are selected by default. Open a new job: it gains Viewed and remains visible.
-2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
+1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/Export JD/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm Skip is unselected and Apps/Saved/Viewed are selected by default. Open a new job: it gains Viewed and remains visible.
+2. Set Saved/Skip and Applied/Interview/Offered/Rejected using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
 3. Toggle each visibility option. Selecting all four should reveal every loaded card, including those matching multiple types. Use the Memory gear button to clear a hidden job's mark and confirm viewed history remains.
 4. Test reposts/tracking URLs, dynamic cards, split details, and Back/Forward navigation. Confirm no duplicate controls.
 5. Open Memory from both entry points. Combine mark/viewed filters, search, change and clear marks, remove a disposable record, and confirm updates reach an open SEEK tab.
-6. Set Saved/Applied to finite retention and Viewed/Skip to Never, save, and inspect both expiry dates. Test shorter-policy confirmation and expired-memory cleanup with disposable data.
+6. Set Saved to finite retention and Viewed/Skip to Never, save, and confirm application history remains without expiry. Test shorter-policy confirmation and expired-memory cleanup with disposable data.
 7. Copy JD, paste into a text editor, then download .md and compare the contents, metadata, and final description paragraph. Confirm the filename and that nothing is stored in extension memory. Test after changing the active job.
-8. If upgrading, confirm old PURSUE becomes SAVED and old SEEN becomes viewed-only. Existing marks, filters and retention settings must be preserved.
+8. If upgrading, confirm old PURSUE becomes SAVED and old SEEN becomes viewed-only. Confirm old Applied migrates with its timestamp and no application is expired by its former finite policy.
 
 ## Extension icon
 
@@ -204,7 +225,7 @@ The same five-button rail provides Copy JD, Markdown download, marks, visibility
 
 LinkedIn URLs may be numeric (`/jobs/view/123/`), title slugs ending in an ID (`/jobs/view/engineer-at-company-123`), or split views (`/jobs/search/?currentJobId=123`). All normalize to `https://www.linkedin.com/jobs/view/123/`. Tracking parameters do not affect identity. Markdown labels the ID as LinkedIn rather than SEEK.
 
-Existing schema-2 memory migrates losslessly to schema 3 with `platform: seek`; existing SEEK keys, IDs, marks, viewed dates and retention anchors stay unchanged. Older V1 migrations still work. Memory displays each record's platform and linked IDs; editing/removing one platform's job does not affect the other.
+Existing schema-2 memory migrates to schema 4 with `platform: seek`; existing SEEK keys, IDs, browsing marks and timestamps stay unchanged; Applied becomes an application stage. Older V1 migrations still work. Memory displays each record's platform and linked IDs; editing/removing one platform's job does not affect the other.
 
 ### LinkedIn DOM assumptions and limits
 
