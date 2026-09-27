@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
   "name": "EasySeek — SEEK NZ browsing memory",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "options_ui": { "page": "options/options.html", "open_in_tab": true },
   "description": "Remember viewed jobs and mark roles Saved, Applied or Skip. Local only.",
   "permissions": ["storage"],
   "background": { "service_worker": "src/background.js" },
   "content_scripts": [{
-    "matches": ["https://www.seek.co.nz/*", "https://seek.co.nz/*"],
+    "matches": ["https://nz.seek.com/*", "https://seek.co.nz/*", "https://www.seek.co.nz/*"],
     "js": ["src/state.js", "src/seek-extractor.js", "src/storage.js", "src/ui.js", "src/content.js"],
     "css": ["src/styles.css"],
     "run_at": "document_idle"

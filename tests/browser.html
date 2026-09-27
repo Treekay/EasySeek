@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><title>EasySeek DOM tests</title>
 <link rel="stylesheet" href="../src/styles.css">
 <main><section id="results">
-<article><h2><a data-automation="jobTitle" href="https://www.seek.co.nz/job/12345678?tracking=x">Full-Stack Engineer</a></h2><span data-automation="jobCompany">Xero Limited</span><span data-automation="jobLocation">Auckland Central</span></article>
+<article><h2><a data-automation="jobTitle" href="https://nz.seek.com/job/12345678?tracking=x">Full-Stack Engineer</a></h2><span data-automation="jobCompany">Xero Limited</span><span data-automation="jobLocation">Auckland Central</span></article>
 </section><section id="detail" data-job-id="12345678"><h1 data-automation="job-detail-title">Full-Stack Engineer</h1><span data-automation="advertiser-name">Xero Limited</span><span data-automation="job-detail-location">Auckland Central</span><div data-automation="jobAdDetails"><p>First paragraph</p><p>Final paragraph of the full description</p></div></section></main>
 <pre id="report">RUNNING</pre>
 <script src="../src/state.js"></script><script src="../src/seek-extractor.js"></script>
@@ -32,7 +32,18 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   };
   assert(card.querySelector('summary').textContent === 'Mark', 'single unmarked control');
   assert(!isHidden(), 'new visible');
-  const detail = EasySeekExtractor.detail(document, 'https://www.seek.co.nz/job/12345678?x=1');
+  const detail = EasySeekExtractor.detail(document, 'https://nz.seek.com/job/12345678?x=1');
+  assert(detail.job.url === 'https://nz.seek.com/job/12345678', 'production canonical detail URL');
+  assert(EasySeekExtractor.cards().get(card).url === detail.job.url, 'production card canonical URL');
+  assert(EasySeekExtractor.detail(document, 'https://nz.seek.com/engineer-jobs?jobId=12345678').job.id === detail.job.id, 'production split search detail');
+  for (const origin of ['https://seek.co.nz', 'https://www.seek.co.nz']) {
+    assert(EasySeekExtractor.detail(document, origin + '/job/12345678').job.url === detail.job.url, 'legacy detail canonical URL');
+  }
+  const unrelated = document.createElement('article');
+  unrelated.innerHTML = '<a href="https://example.com/job/12345678">Unrelated job</a>';
+  document.querySelector('#results').append(unrelated);
+  assert(!EasySeekExtractor.cards().has(unrelated), 'unrelated card rejected');
+  unrelated.remove();
   assert(detail.job.description.includes('Final paragraph'), 'detail detection');
   records = S.apply(records, detail.job, 'VIEW');
   listeners.forEach(fn => fn({ records: { newValue: records } }, 'local')); await pause();

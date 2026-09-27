@@ -2,6 +2,40 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const S = require('../src/state.js');
 const job = { id: '12345678', title: 'Full-Stack Engineer', company: 'Xero Limited', location: 'Auckland Central', url: 'https://www.seek.co.nz/job/12345678?tracking=abc' };
+test('production and legacy domains share identity; unrelated origins are rejected', () => {
+  for (const origin of ['https://nz.seek.com', 'https://seek.co.nz', 'https://www.seek.co.nz']) {
+    assert.equal(S.isSeekUrl(origin + '/software-engineer-jobs?jobId=12345678'), true);
+    assert.equal(S.jobId(origin + '/job/12345678?tracking=abc#description'), job.id);
+    assert.equal(S.identity({ url: origin + '/job/12345678?tracking=other' }).key, 'seek:' + job.id);
+  }
+  for (const origin of ['https://example.com', 'https://nz.seek.com.example.com', 'https://seek.com', 'https://www.seek.com', 'http://nz.seek.com', 'https://nz.seek.com:8443', 'https://nz.seek.com@example.com', 'blob:https://nz.seek.com']) {
+    assert.equal(S.isSeekUrl(origin + '/job/12345678'), false, origin);
+    assert.equal(S.jobId(origin + '/job/12345678'), '', origin);
+  }
+  assert.equal(S.isSeekUrl('/jobs'), false);
+  assert.equal(S.isSeekUrl('not a URL'), false);
+  assert.equal(S.canonicalUrl(job.id), 'https://nz.seek.com/job/12345678');
+  assert.equal(S.canonicalUrl('123?tracking=x'), '');
+});
+test('manifest matches stay aligned with the shared origin list', () => {
+  const manifest = require('../manifest.json');
+  assert.deepEqual(manifest.content_scripts[0].matches, S.seekOrigins.map(origin => origin + '/*'));
+});
+test('legacy stored marks and viewed history survive production-domain observations', () => {
+  for (const mark of ['SKIP', 'SAVED', 'APPLIED']) {
+    const records = S.apply(S.apply([], job, 'VIEW', 10), job, mark, 20);
+    records[0].url = 'https://www.seek.co.nz/job/12345678';
+    assert.deepEqual(S.migrate(records, 30), records);
+    const updated = S.apply(records, { url: 'https://nz.seek.com/job/12345678?tracking=new' }, 'OBSERVE', 30);
+    assert.equal(updated.length, 1);
+    assert.equal(updated[0].url, 'https://nz.seek.com/job/12345678');
+    assert.equal(updated[0].mark, mark);
+    assert.equal(updated[0].markChangedAt, 20);
+    assert.equal(updated[0].lastViewedAt, 10);
+    assert.deepEqual(updated[0].seekIds, records[0].seekIds);
+    assert.equal(updated[0].canonicalKey, records[0].canonicalKey);
+  }
+});
 test('identity ignores tracking, normalizes suffixes/hyphens, preserves seniority', () => {
   assert.equal(S.jobId(job.url), job.id);
   assert.equal(S.jobId('/job/12345678?x=2'), job.id);

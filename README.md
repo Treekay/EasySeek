@@ -10,7 +10,13 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 2. Choose **Load unpacked** and select the folder containing `manifest.json` (`F:\code\EasySeek`).
 3. For an existing installation, click **Reload** on EasySeek. Reload open SEEK tabs and the Memory page so they use the new scripts.
 
-Supported hosts: exactly `https://www.seek.co.nz` and `https://seek.co.nz`. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these two hosts for client-side navigation, but add UI only to recognized cards/details.
+Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, but add UI only to recognized cards/details.
+
+Version **1.2.1** adds `https://nz.seek.com/*` support. Chrome may request approval for this additional site access when updating. Reload the extension and your SEEK tabs after updating.
+
+Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
+
+Newly recorded or observed jobs use `https://nz.seek.com/job/{id}` as their canonical URL. Existing legacy URLs remain valid: identity is based on SEEK IDs/canonical keys, not the domain or tracking parameters. Existing marks, marked dates and viewed history are preserved. An existing record's URL is updated when its job is next observed; no destructive migration is needed.
 
 ## Viewed history and user marks
 
@@ -126,9 +132,9 @@ Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName
 
 `tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: menus, dismissal, all filters, Show Hidden, mark/view independence, aliases, malformed cards, and SPA navigation. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
-Verified: 17 Node tests, JavaScript syntax checks, and both headless Chrome fixtures. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
+Verified: 21 Node tests, JavaScript syntax checks, and both headless Chrome fixtures. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
-1. Confirm only Hide Skip is enabled by default. Open a new job: it gains Viewed and remains visible.
+1. Open a search on `https://nz.seek.com` and confirm the EasySeek strip and mark controls appear. Confirm only Hide Skip is enabled by default. Open a new job: it gains Viewed and remains visible.
 2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
 3. Toggle each filter. Show Hidden should reveal every loaded card, including those matching several filters. Clear a hidden job's mark and confirm viewed history remains.
 4. Test reposts/tracking URLs, dynamic cards, split details, and Back/Forward navigation. Confirm no duplicate controls.

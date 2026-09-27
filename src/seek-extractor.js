@@ -27,7 +27,7 @@
       if (ids.size !== 1) continue;
       const title = read(node, selectors.cardTitle) || text(link);
       if (!title) continue;
-      result.set(node, { id, title, company: read(node, selectors.company), location: read(node, selectors.location), url: 'https://www.seek.co.nz/job/' + id });
+      result.set(node, { id, title, company: read(node, selectors.company), location: read(node, selectors.location), url: EasySeekState.canonicalUrl(id) });
     }
     return result;
   }
@@ -48,7 +48,7 @@
     return { node: scope, heading, descriptionNode: description, job: {
       id, title: text(heading), company: read(scope, selectors.detailCompany),
       location: read(scope, selectors.detailLocation), salary: read(scope, selectors.salary),
-      posted: read(scope, selectors.posted), url: 'https://www.seek.co.nz/job/' + id,
+      posted: read(scope, selectors.posted), url: EasySeekState.canonicalUrl(id),
       description: text(description)
     } };
   }

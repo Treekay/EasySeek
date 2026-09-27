@@ -1,6 +1,17 @@
 (function (root) {
   'use strict';
   const DAY = 86400000;
+  // Manifest match patterns are declarative; tests keep them aligned with this list.
+  const seekOrigins = Object.freeze(['https://nz.seek.com', 'https://seek.co.nz', 'https://www.seek.co.nz']);
+  const canonicalOrigin = seekOrigins[0];
+  function isSeekUrl(url) {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' && seekOrigins.includes(parsed.origin);
+    }
+    catch { return false; }
+  }
+  function canonicalUrl(id) { return /^\d+$/.test(String(id || '')) ? `${canonicalOrigin}/job/${id}` : ''; }
   const normalize = value => String(value || '').normalize('NFKC').toLowerCase()
     .replace(/[\u2010-\u2015-]/g, ' ').replace(/\s+/g, ' ').trim();
   const company = value => normalize(value).replace(/,?\s+\b(limited|ltd)\.?$/, '').trim();
@@ -15,8 +26,8 @@
   };
   function jobId(url) {
     try {
-      const parsed = new URL(url, 'https://www.seek.co.nz');
-      if (!['www.seek.co.nz', 'seek.co.nz'].includes(parsed.hostname)) return '';
+      const parsed = new URL(url, canonicalOrigin);
+      if (!isSeekUrl(parsed.href)) return '';
       return parsed.pathname.match(/^\/job\/(\d+)(?:\/|$)/)?.[1] || '';
     } catch { return ''; }
   }
@@ -57,7 +68,7 @@
         record.updatedAt, record.lastSeenAt, record.firstSeenAt].find(timestamp) ?? now;
       const { status, statusChangedAt, manualAt, ...metadata } = record;
       return { ...metadata, schemaVersion: 2,
-        url: record.seekIds[0] ? 'https://www.seek.co.nz/job/' + record.seekIds[0] : '',
+        url: canonicalUrl(record.seekIds[0]),
         mark: status === 'PURSUE' ? 'SAVED' : status === 'SKIP' ? 'SKIP' : 'NONE',
         markChangedAt: ['PURSUE', 'SKIP'].includes(status) ? assigned : null,
         // V1 did not distinguish viewing a marked job from observing its card.
@@ -118,7 +129,7 @@
       seekIds: [...new Set([...found.flatMap(record => record.seekIds), ident.id].filter(Boolean))],
       title: job.title || old?.title || '', company: job.company || old?.company || '',
       city: city(job.location) || old?.city || '',
-      url: old?.url || (ident.id ? 'https://www.seek.co.nz/job/' + ident.id : ''),
+      url: canonicalUrl(ident.id) || old?.url || '',
       mark: automatic ? old?.mark || 'NONE' : action,
       markChangedAt: automatic ? old?.markChangedAt ?? null : now,
       lastViewedAt: action === 'VIEW' ? now : viewedTimes.length ? Math.max(...viewedTimes) : null,
@@ -127,7 +138,7 @@
     };
     return record.mark !== 'NONE' || timestamp(record.lastViewedAt) ? [...rest, record] : rest;
   }
-  root.EasySeekState = { DAY, normalize, company, city, jobId, identity, matches, getState, hidden, cleanup, apply,
+  root.EasySeekState = { DAY, seekOrigins, canonicalOrigin, isSeekUrl, canonicalUrl, normalize, company, city, jobId, identity, matches, getState, hidden, cleanup, apply,
     marks, filterKeys, retentionKeys, defaults, preferences, validDays, recordKey, migrate, expiresAt, manage };
   if (typeof module !== 'undefined') module.exports = root.EasySeekState;
 })(globalThis);

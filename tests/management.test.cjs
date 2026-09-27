@@ -19,6 +19,19 @@ function worker(initial = {}) {
     });
   } };
 }
+test('background accepts production searches/details and legacy domains, rejecting lookalikes', async () => {
+  const w = worker();
+  for (const url of ['https://nz.seek.com/software-engineer-jobs', 'https://nz.seek.com/job/1?tracking=x', 'https://seek.co.nz/jobs', 'https://www.seek.co.nz/job/1']) {
+    const result = await w.send({ type: 'action', job, action: 'SAVED' }, url);
+    assert.equal(result.ok, true, url);
+    assert.equal(result.records[0].url, 'https://nz.seek.com/job/1');
+  }
+  assert.equal(w.saved.records.length, 1);
+  for (const url of ['https://nz.seek.com.example.com/jobs', 'https://example.com/jobs', 'http://nz.seek.com/jobs', 'blob:https://nz.seek.com/jobs', '/jobs']) {
+    assert.equal(await w.send({ type: 'read' }, url), null, url);
+  }
+  assert.equal((await w.send({ type: 'manage', key: S.recordKey(w.saved.records[0]), action: 'REMOVE' }, 'https://nz.seek.com/jobs')).ok, false);
+});
 test('options can migrate and manage; SEEK can open options but not remove records', async () => {
   const legacy = [{ status: 'PURSUE', canonicalKey: '', seekIds: ['1'], title: 'Engineer', firstSeenAt: Date.now(), lastSeenAt: Date.now(), updatedAt: Date.now() }];
   const w = worker({ records: legacy });
