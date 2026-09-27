@@ -12,11 +12,43 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.4.3** supports LinkedIn's SDUI `/jobs/search-results/` layout: job actions recognize the selected detail, and visibility filters recognize button-based result cards. The detail title link and AboutTheJob component must agree on the job ID before actions are enabled. Reload the extension and your SEEK/LinkedIn tabs after updating.
+Version **1.5.0** adds versioned YAML metadata to both Copy JD and Export JD, including canonical identity and current EasySeek mark/viewed state. Filenames now include the source platform. Reload the extension and your SEEK/LinkedIn tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
 Newly recorded or observed jobs use `https://nz.seek.com/job/{id}` as their canonical URL. Existing legacy URLs remain valid: identity is based on SEEK IDs/canonical keys, not the domain or tracking parameters. Existing marks, marked dates and viewed history are preserved. An existing record's URL is updated when its job is next observed; no destructive migration is needed.
+
+## Structured Markdown handoff
+
+Copy JD and Export JD use the same formatter and produce the same UTF-8 Markdown for an unchanged active job and EasySeek state. Each click re-extracts the currently rendered JD and reads the tab's current EasySeek state. The YAML front matter uses schema version 1, followed by a human-readable title, `## Job` metadata, and `## Job Description` with the full extracted text.
+
+```yaml
+---
+easyseek_schema: 1
+platform: "seek"
+job_id: "12345678"
+canonical_url: "https://nz.seek.com/job/12345678"
+canonical_key: "xero|auckland|software engineer"
+mark: "saved"
+viewed: true
+title: "Software Engineer"
+company: "Xero"
+location: "Auckland"
+salary: null
+posted: "2d ago"
+exported_at: "2026-09-27T01:02:03.000Z"
+---
+```
+
+- `platform` is `seek` or `linkedin`; `job_id` is a string containing the platform's numeric ID. `canonical_url` uses the existing normalized URL without tracking parameters.
+- `canonical_key` reuses EasySeek's canonical identity logic, including the `linkedin|` prefix. It is `null` when there is insufficient metadata for a canonical key; consumers can use platform plus job ID instead.
+- `mark` is `none`, `skip`, `saved`, or `applied`. `viewed` is a YAML boolean. These describe local EasySeek state, independently of native site marks.
+- `title`, `company`, `location`, `salary`, and `posted` contain extracted text; missing/blank values are consistently `null`. All strings are double-quoted with escaped quotes, backslashes and newlines. Human-readable missing fields say “Not available”.
+- `exported_at` is an ISO 8601 UTC timestamp for the generated snapshot. The tab reuses that timestamp while the job content and state remain unchanged, ensuring Copy and Export are byte-identical. A changed job/content/state or navigation creates a fresh timestamp on the next explicit handoff. The formatter accepts an explicit timestamp for reproducible output.
+
+Download names retain bounded, sanitized slugs: `company-title-platform-jobId.md`, for example `xero-software-engineer-seek-12345678.md` or `partly-backend-engineer-linkedin-4321123456.md`.
+
+This is a portable handoff for external tools or agents, including career-ops; no tool is required or directly integrated. EasySeek does not send the output anywhere, perform analysis, call APIs or synchronize data. Copy and download are explicit and local. They do not change marks, Viewed history or retention timestamps, and never persist the JD to `chrome.storage`. Only transient in-tab snapshot information is kept for consistent output.
 
 ## Viewed history and user marks
 
@@ -30,7 +62,7 @@ These are independent concepts:
 The right-middle edge of the viewport has five compact, fixed 40 × 40 px square buttons. Copy uses a clipboard icon, Export a download icon, Mark a pencil, Filter a funnel, and Memory a gear; accessible names and hover tooltips identify each action. Submenu buttons are also square. There are no injected action bars inside cards or detail panels.
 
 - **Copy JD** (blue) copies the active job as structured Markdown and shows “Copied” after success.
-- **Export JD** (green download icon) downloads the same Markdown as `company-title-seekJobId.md`.
+- **Export JD** (green download icon) downloads the same Markdown as `company-title-platform-jobId.md`.
 - **Mark** opens three equal-sized buttons to its left: **Skip / Saved / Applied**. Selecting one closes the menu. The pencil icon color and tooltip reflect the current mark; its tooltip also shows whether the job was viewed. Saved and Applied cards retain subtle outlines.
 - **Filter** opens four independent toggle buttons to its left. Selected toggles have a blue state and a check: they indicate which types of jobs are shown. This menu stays open for repeated changes; Escape, clicking outside, or clicking Filter again closes it. The Filter tooltip reports loaded cards shown/hidden.
 
@@ -149,7 +181,7 @@ Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName
 
 `tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, positive visibility filters, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
-Verified: 30 Node tests, JavaScript syntax checks, and four headless Chrome fixtures (SEEK, legacy LinkedIn, SDUI LinkedIn, Memory). The LinkedIn extractor also passed a local Chrome check against freshly retrieved public HTML: 60 result cards and one full detail with company/location/description. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
+Verified: 35 Node tests, JavaScript syntax checks, and four headless Chrome fixtures (SEEK, legacy LinkedIn, SDUI LinkedIn, Memory). The LinkedIn extractor also passed a local Chrome check against freshly retrieved public HTML: 60 result cards and one full detail with company/location/description. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
 1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/Export JD/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm Skip is unselected and Applied/Saved/Viewed are selected by default. Open a new job: it gains Viewed and remains visible.
 2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.

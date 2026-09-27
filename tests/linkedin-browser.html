@@ -13,6 +13,7 @@ E.detail = () => realDetail(document, route()); E.active = url => realActive(rou
 let records = [], preferences = S.preferences();
 const listeners = [];
 globalThis.chrome = { runtime: { async sendMessage(message) {
+  if (JSON.stringify(message).includes('"description"')) throw new Error('JD sent to storage worker');
   if (message.type === 'action') records = S.apply(records, message.job, message.action);
   if (message.type === 'observe') for (const job of message.jobs) records = S.apply(records, job, 'OBSERVE');
   if (message.type === 'preferences') Object.assign(preferences, message.preferences);
@@ -54,6 +55,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   button('mark').click(); button('mark-SKIP').click(); await pause();
   assert(card.classList.contains('easyseek-hidden') && records[0].mark === 'SKIP', 'skip hides card');
   button('filter').click(); button('hideSkipped').click(); await pause(); assert(!card.classList.contains('easyseek-hidden'), 'filter restores');
+  const beforeExport = JSON.stringify(records);
   let copied = '', blob, filename;
   Object.defineProperty(navigator, 'clipboard', { value: { async writeText(value) { copied = value; } } });
   URL.createObjectURL = value => { blob = value; return 'blob:fixture'; };
@@ -61,6 +63,9 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   button('copy').click(); await pause(); button('export').click(); await pause();
   assert(copied.includes('LinkedIn Job ID') && copied.includes('Final paragraph') && copied.includes('https://www.linkedin.com/jobs/view/123/'), 'LinkedIn Markdown');
   assert(await blob.text() === copied && filename.endsWith('-123.md'), 'download handoff');
+  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "skip"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
+  assert(!records.some(record => 'description' in record), 'no full JD persistence');
   const clone = card.cloneNode(true); clone.dataset.occludableJobId = '456'; clone.querySelector('a').href = 'https://www.linkedin.com/jobs/view/456/'; document.querySelector('#results').append(clone); await pause(); await pause();
   assert(S.getState(records, E.cards().get(clone)).mark === 'SKIP' && records[0].linkedinIds.includes('456'), 'dynamic aliases');
   const markTime = records[0].markChangedAt;

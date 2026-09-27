@@ -18,6 +18,7 @@ E.detail = () => realDetail(document, route()); E.active = url => realActive(rou
 let records = [], preferences = S.preferences();
 const listeners = [];
 globalThis.chrome = { runtime: { async sendMessage(message) {
+  if (JSON.stringify(message).includes('"description"')) throw new Error('JD sent to storage worker');
   if (message.type === 'action') records = S.apply(records, message.job, message.action);
   if (message.type === 'observe') for (const job of message.jobs) records = S.apply(records, job, 'OBSERVE');
   if (message.type === 'preferences') Object.assign(preferences, message.preferences);
@@ -45,16 +46,26 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(E.cards().size === 1 && E.cards().get(card).title === 'Engineer', 'button card deduplicated without accessibility label');
   for (const key of ['copy', 'export', 'mark']) assert(!button(key).disabled, key + ' enabled');
   assert(records[0].lastViewedAt !== null, 'view recorded');
+  const beforeExport = JSON.stringify(records);
   let copied = '', blob;
   Object.defineProperty(navigator, 'clipboard', { value: { async writeText(value) { copied = value; } } });
   URL.createObjectURL = value => { blob = value; return 'blob:fixture'; };
   HTMLAnchorElement.prototype.click = function () {};
   button('copy').click(); await pause(); button('export').click(); await pause();
   assert(copied.includes('Final requirement') && await blob.text() === copied, 'copy and export full JD');
+  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "none"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
+  assert(!records.some(record => 'description' in record), 'no full JD persistence');
   button('mark').click(); button('mark-SKIP').click(); await pause();
   assert(card.classList.contains('easyseek-hidden') && records[0].mark === 'SKIP', 'skip filters SDUI card');
   button('filter').click(); button('hideSkipped').click(); await pause();
   assert(!card.classList.contains('easyseek-hidden'), 'restore SDUI card');
+  body.querySelector('[data-testid="expandable-text-box"]').append(document.createTextNode(' Newly rendered requirement'));
+  await pause();
+  const afterMark = JSON.stringify(records);
+  button('copy').click(); await pause(); button('export').click(); await pause();
+  assert(copied.includes('mark: "skip"\n') && copied.includes('Newly rendered requirement') && await blob.text() === copied, 'handoff refreshes state and currently rendered JD');
+  assert(JSON.stringify(records) === afterMark, 'repeat handoff leaves mark timestamps unchanged');
   const clone = card.cloneNode(true); clone.setAttribute('componentkey','job-card-component-ref-456'); clone.querySelector('[componentkey]').setAttribute('componentkey','job-card-component-ref-456'); document.querySelector('#results').append(clone); await pause();
   assert(records[0].linkedinIds.includes('456'), 'dynamic SDUI card alias');
   history.pushState({}, '', '?id=999'); window.dispatchEvent(new PopStateEvent('popstate')); await pause();

@@ -4,6 +4,7 @@
   let records = [], preferences = S.preferences();
   let ready = false, running = false, rerun = false, timer, rail;
   let route = location.href, opened = '', previousDetail = null, staleDetail = null;
+  let exportSnapshot = null;
   const mounted = new Set(), observed = new Set();
   const memoryJob = ({ id, platform, title, company, location, url }) => ({ id, platform, title, company, location, url });
   const fail = error => UI.notify('EasySeek: ' + error.message, true);
@@ -28,6 +29,7 @@
     const oldId = routeId(route);
     const newId = routeId(location.href);
     route = location.href;
+    exportSnapshot = null;
     observed.clear();
     if (oldId === newId) return;
     opened = '';
@@ -51,12 +53,21 @@
     if (!detail) { schedule(); throw new Error('Open a job and wait for its description to load.'); }
     return detail.job;
   }
+  function handoff() {
+    // Re-extract on every explicit action. Keep only an in-tab snapshot signature
+    // and creation time so Copy and Export of unchanged content are identical.
+    const job = requireJob();
+    const state = S.getState(records, job);
+    const key = JSON.stringify([job, state]);
+    if (exportSnapshot?.key !== key) exportSnapshot = { key, exportedAt: new Date().toISOString() };
+    return [job, state, exportSnapshot.exportedAt];
+  }
   async function copy() {
-    try { await navigator.clipboard.writeText(EasySeekJD.markdown(requireJob())); UI.notify('Copied'); }
+    try { await navigator.clipboard.writeText(EasySeekJD.markdown(...handoff())); UI.notify('Copied'); }
     catch (error) { fail(new Error('Could not copy. ' + error.message)); }
   }
   function download() {
-    try { EasySeekJD.download(requireJob()); UI.notify('Download started'); }
+    try { EasySeekJD.download(...handoff()); UI.notify('Download started'); }
     catch (error) { fail(new Error('Could not export. ' + error.message)); }
   }
   function mark(value) {

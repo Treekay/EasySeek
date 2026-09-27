@@ -9,6 +9,7 @@
 let records = [], preferences = EasySeekState.preferences(), memoryOpened = 0;
 const listeners = [];
 globalThis.chrome = { runtime: { async sendMessage(message) {
+  if (JSON.stringify(message).includes('"description"')) throw new Error('JD sent to storage worker');
   if (message.type === 'action') records = EasySeekState.apply(records, message.job, message.action);
   if (message.type === 'observe') for (const job of message.jobs) records = EasySeekState.apply(records, job, 'OBSERVE');
   if (message.type === 'preferences') Object.assign(preferences, message.preferences);
@@ -69,6 +70,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(S.filterKeys.every(key => !preferences[key]), 'all selected shows every type');
   rail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert(menu('filter').hidden, 'Escape closes');
   button('filter').click(); document.body.click(); assert(menu('filter').hidden, 'outside click closes');
+  const beforeExport = JSON.stringify(records);
   let copied = '', exported = null, downloaded = '';
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { async writeText(value) { copied = value; } } });
   URL.createObjectURL = blob => { exported = blob; return 'blob:test-download'; };
@@ -78,8 +80,11 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(copied.includes('Final paragraph') && copied.includes('**SEEK Job ID:** 12345678') && copied.includes('https://nz.seek.com/job/12345678'), 'copy full structured markdown');
   assert(document.querySelector('.easyseek-feedback').textContent === 'Copied', 'copy feedback');
   button('export').click(); await pause();
-  assert(await exported.text() === copied && downloaded === 'xero-limited-full-stack-engineer-12345678.md', 'export same markdown and safe filename');
+  assert(await exported.text() === copied && downloaded === 'xero-limited-full-stack-engineer-seek-12345678.md', 'export same markdown and safe filename');
   assert(!records.some(record => 'description' in record), 'no JD persistence');
+  assert(copied.startsWith('---\neasyseek_schema: 1\n') && copied.includes('mark: "saved"\n') && copied.includes('viewed: true\n'), 'current EasySeek state in YAML');
+  assert(JSON.stringify(records) === beforeExport, 'copy/export do not change records or timestamps');
+  assert(!records.some(record => 'description' in record), 'no full JD persistence');
   navigator.clipboard.writeText = async () => { throw new Error('denied'); };
   button('copy').click(); await pause(); assert(document.querySelector('.easyseek-feedback').textContent.includes('Could not copy'), 'copy failure feedback');
   const clone = card.cloneNode(true); clone.querySelector('a').href = 'https://www.seek.co.nz/job/99999999';
