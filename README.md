@@ -1,112 +1,137 @@
 # EasySeek V1
 
-A lightweight Manifest V3 Chrome extension that adds short-term browsing memory to SEEK New Zealand. Keep using SEEK's own search results and job details: hide reviewed or skipped jobs, highlight roles to pursue, and copy the current job for Career Ops.
+A lightweight Manifest V3 Chrome extension for SEEK New Zealand browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved**, **Applied**, or **Skip**, while keeping SEEK's own search and detail UI.
 
-No build step, dependencies, backend, account, analytics, network requests, crawler, or application automation. Data stays in `chrome.storage.local` in this Chrome profile. Full descriptions are extracted only for the current detail view and are never persisted.
+Plain JavaScript and CSS, no build step or dependencies. All data stays in `chrome.storage.local` in this Chrome profile. No backend, accounts, cloud sync, analytics, network requests, crawling, application automation, or messages. Full job descriptions are never stored. Career Ops Markdown copying and clipboard permission have been removed; export/sync are not implemented.
 
-## Install
+## Install or update
 
-1. Open `chrome://extensions` in Chrome and enable **Developer mode**.
-2. Choose **Load unpacked** and select this folder, `F:\code\EasySeek` (the folder containing `manifest.json`).
-3. Open or reload a SEEK NZ search page. Existing SEEK tabs need a reload after installation or extension updates.
+1. Open `chrome://extensions` and enable **Developer mode**.
+2. Choose **Load unpacked** and select the folder containing `manifest.json` (`F:\code\EasySeek`).
+3. For an existing installation, click **Reload** on EasySeek. Reload open SEEK tabs and the Memory page so they use the new scripts.
 
-Supported hosts are exactly `https://www.seek.co.nz` and `https://seek.co.nz`. Search results, `/job/{numeric ID}` detail pages, and search/detail split views with a numeric `jobId` query parameter are supported when the DOM clues below are present. No other SEEK countries or subdomains are enabled. The script matches all paths on these two hosts to support client-side navigation; UI is only added to recognized job cards/details.
+Supported hosts: exactly `https://www.seek.co.nz` and `https://seek.co.nz`. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these two hosts for client-side navigation, but add UI only to recognized cards/details.
 
-## Use
+## Viewed history and user marks
 
-The small **EasySeek** strip above results has **Hide Seen** and **Hide Skipped**, both on by default, and **Show Hidden**. Counts describe currently loaded DOM cards, not all matches or unique opportunities. Hide preferences persist across tabs/reloads; Show Hidden is temporary and resets on navigation.
+These are independent concepts:
 
-| State | Behavior |
+- **Viewed** means a detail page successfully rendered a title and description. Opening it updates `lastViewedAt`; encountering a search card does not count as viewing.
+- **Mark** is your explicit decision: NONE, SKIP, SAVED, or APPLIED. Opening or observing the job never overwrites the mark or its timestamp.
+
+Each card/detail has one compact mark control. Click it to open **Saved / Applied / Skip / Clear mark**. The control reflects the current mark; Saved and Applied cards also have distinct outlines. A separate Viewed label indicates browsing history. The menu supports normal keyboard navigation and Escape to close; clicking outside closes it.
+
+**Clear mark** returns to NONE and preserves any unexpired viewed history. **Remove record** in Memory deletes both the mark and viewed history, including all linked listing IDs. If clearing a mark leaves no viewed history, the empty record is discarded. Selecting a mark again is a new manual decision and restarts its mark retention timer.
+
+## Search filters
+
+| Filter | Default |
 | --- | --- |
-| NEW | No remembered record; shown normally. |
-| SEEN | A successfully rendered detail page was opened; hidden when Hide Seen is on. |
-| SKIP | Explicit decision; hidden when Hide Skipped is on. Opening it preserves SKIP. |
-| PURSUE | Explicit decision; always visible with a green outline and badge. Opening it preserves PURSUE. |
+| Hide Skip | On |
+| Hide Applied | Off |
+| Hide Saved | Off |
+| Hide Viewed | Off |
 
-Use **Skip**, **Pursue**, or **Reset** on cards or details. Show Hidden reveals hidden cards with state badges and Reset controls. Hiding uses a reversible CSS class, never deletes SEEK's cards. Reset clears the whole remembered opportunity, including linked listing IDs. Reset on an already open detail stays NEW for that visit; leaving and reopening it can mark it SEEN again.
+All four can be changed in the search strip or Memory settings. Any enabled matching filter can hide a card: for example Hide Viewed can hide a viewed Saved job even when Hide Saved is off. **Show Hidden** temporarily overrides every filter so you can inspect and change hidden jobs. It resets on navigation and is not stored. Counts refer to currently loaded cards, not total SEEK matches or unique opportunities.
 
-The background worker serializes writes from all tabs. Automatic SEEN/observation updates preserve explicit decisions. Storage changes update other open SEEK tabs.
+Filtering uses reversible CSS classes, never removes SEEK nodes. Settings and record changes propagate to other open SEEK tabs through storage events. A single background writer serializes updates from all tabs.
 
-## Identity and retention
+## Independent retention
 
-SEEK IDs are extracted from `/job/12345678`; tracking parameters do not affect identity. Complete company + city + title metadata also links reposts with different IDs. Company normalization trims a trailing Ltd/Limited, title normalization treats hyphens as spaces, and seniority is preserved. Thus `Xero Limited / Auckland Central / Full-Stack Engineer` becomes `xero|auckland|full stack engineer`. Software Engineer and Senior Software Engineer remain distinct.
+| Memory | Default | Retention anchor |
+| --- | --- | --- |
+| Viewed | 60 days | `lastViewedAt`: last actual detail opening |
+| Skip | 60 days | `markChangedAt`: explicit mark assignment |
+| Saved | Never | `markChangedAt` if configured finite |
+| Applied | Never | `markChangedAt` if configured finite |
 
-Only explicitly recognized city names are normalized; unknown locations, remote-only text, and missing fields do not create a fallback key. Those listings use their ID instead of risking unrelated matches. Different jobs with an identical complete canonical key intentionally share a decision, as requested. This heuristic cannot distinguish separate vacancies with identical company/city/title.
+Each policy independently offers **30 / 60 / 90 / 180 days / Never** in Memory settings. Expiry is the anchor plus the selected number of 24-hour days, inclusive of the expiry boundary. Repeated search appearances, observations in another tab, and discovered listing aliases do not extend either timer. Reopening a detail refreshes viewed history only, never the mark timer.
 
-Records contain canonical key, linked SEEK IDs, title, company, city, status, timestamps, and the latest manual-action timestamp. SEEN/SKIP default to **60 days since statusChangedAt**, including the exact expiry boundary. Retention measures the status decision, not repeated SEEK appearances. Observation may update `lastSeenAt` and link new listing IDs, but never changes `statusChangedAt` or extends retention. Opening an already remembered job also preserves its decision timestamp. PURSUE never expires automatically; it stays until you manually change or remove it.
+Cleanup clears only the expired part. An expired Skip mark becomes NONE while recent viewed history remains. Expired viewed history does not remove an unexpired Saved/Applied/Skip mark. The record is deleted only when neither a mark nor viewed history remains. Settings changes do not rewrite timestamps and affect the next cleanup, including cleanup performed when saving them. Shortening retention requires confirmation because it may immediately discard older memory. Extending a policy cannot recover information already removed.
 
-Seen and skipped retention are independently configurable as 30, 60, 90, 180 days or Never. `expiresAt = statusChangedAt + days × 86400000`. Saving a policy applies cleanup using the original timestamps, without rewriting them; shortening a policy requires confirmation and may immediately remove older records. Cleanup runs on worker requests (including SEEK load/pageshow and management-page refresh); there is no scheduled task. Expiry removes the complete opportunity and its linked IDs.
+Cleanup is opportunistic on background requests, including SEEK load/pageshow, Memory opening/Refresh, and Clear expired memory. No scheduled task is installed; an idle tab need not update at the exact expiry instant.
 
-Existing V1 records migrate automatically: SKIP/PURSUE use a meaningful `manualAt`; otherwise the fallback is `updatedAt`, then `lastSeenAt`, then `firstSeenAt`. If no usable timestamp exists, the migration time is used and persisted once. Migration preserves all existing fields and records; normal cleanup then applies the configured retention. Missing `statusChangedAt` alone never causes deletion. V1 observation overwrote `updatedAt`, so migrated SEEN timestamps are necessarily an approximation; after migration they remain stable.
+## EasySeek Memory
 
-## Manage remembered jobs
+Open **chrome://extensions → EasySeek → Details → Extension options**, or click **Manage EasySeek** in the search strip.
 
-Open **chrome://extensions → EasySeek → Details → Extension options**, or click **Manage EasySeek** in the search control strip. The options page lets you inspect all remembered jobs without visiting SEEK.
+- Inspect every remembered opportunity: title, company, city, mark, marked date, mark expiry, last viewed date, viewed expiry, and linked SEEK IDs.
+- Search title/company and combine a mark filter (including NONE) with Viewed/Not viewed. No marked date/expiry is shown for NONE; no viewed date is shown when viewing is unknown or expired.
+- Choose a mark and **Apply**, including Clear mark. This changes only the explicit decision; it does not manufacture a viewing event.
+- **Remove record** deletes all memory for the opportunity after confirmation.
+- Configure the four retention policies and search filters independently.
+- **Clear expired memory now** requires confirmation and preserves all unexpired information. Saved/Applied can expire only if you explicitly configure a finite policy for them. There is no bulk-delete Saved/Applied action.
 
-- Search title/company, filter All/SEEN/SKIP/PURSUE, and review records sorted by newest status assignment. Each row shows title, company, city, marked date, expiry or Never, last observation date, and all linked SEEK IDs.
-- Select a status and click **Apply**. This is a new manual decision, even if you choose the same status; its retention starts now. It does not pretend you observed the job again.
-- **Remove** clears the opportunity and all linked IDs after confirmation, just like Reset. It can appear as NEW again on SEEK.
-- **Settings** controls seen and skipped retention independently. PURSUE has no automatic expiry setting.
-- **Maintenance** offers Clear expired, Clear all SEEN, and Clear all SKIP, each requiring confirmation. These actions never bulk-delete PURSUE. Removal cannot be undone.
+The default ordering is most recently changed mark first, using the last-viewed date for records without a mark-change date. Storage uses this Chrome profile only, not Chrome Sync. Uninstalling the extension removes its local memory.
 
-All changes use the existing serialized background storage writer and propagate to open SEEK tabs. No full descriptions are stored or displayed in management.
+## Migration from earlier V1 versions
 
-Removing the extension clears its local storage. Chrome profile sync is not used. Stored decisions can be inspected in the extension service worker console with `chrome.storage.local.get(null).then(console.log)`.
+Migration is automatic and idempotent:
 
-## Career Ops
+- PURSUE → SAVED, preserving the original decision date.
+- SKIP → SKIP, preserving the original decision date.
+- SEEN → NONE with viewed history, using the old status assignment timestamp as the best known viewing time.
+- Earlier records without `statusChangedAt` use meaningful `manualAt` for explicit decisions, otherwise `updatedAt`, `lastSeenAt`, or `firstSeenAt`; if none exists, use migration time once.
 
-On a loaded detail, click **Analyze with Career Ops**. It copies Markdown containing title, company, location, salary, posted age/date, SEEK ID, canonical URL, the full rendered description text, and the requested analysis checklist. Missing optional fields say “Not available.” A successful write displays **Copied for Career Ops**; a failed write displays an error. Paste it into your existing Career Ops workflow yourself.
+Old SKIP/PURSUE records cannot reliably tell whether you opened the detail or merely saw a card. Migration does not invent viewed history for these records. Identity, linked IDs, title/company/city and observation timestamps are preserved. Missing new fields alone do not cause deletion; cleanup runs after migration under the current policies.
 
-It never opens or contacts Career Ops. Description formatting becomes readable plain text within Markdown. Expand any collapsed description in SEEK first; extraction reflects the currently rendered visible text. Clipboard write permission is used only on the explicit button click. Other permissions are limited to local storage and content-script access to the two SEEK NZ hosts.
+Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old Hide Seen behavior is retired: Hide Viewed starts off. Existing Hide Skipped preference is retained. New Saved/Applied retention defaults to Never and their filters start off.
 
-## Source and maintenance
+## Identity and schema
+
+SEEK IDs come from `/job/12345678`; query/tracking parameters are ignored. Complete normalized company + city + title also links reposts with different IDs. Trailing Ltd/Limited and title hyphens are normalized, while seniority is preserved: `Xero Limited / Auckland Central / Full-Stack Engineer` becomes `xero|auckland|full stack engineer`. Software Engineer and Senior Software Engineer remain distinct.
+
+Only explicitly recognized city names are collapsed. Unknown/missing location or company does not form a partial fallback key; use the SEEK ID instead. Identical complete canonical keys intentionally share memory, even if SEEK issued another ID. This heuristic cannot distinguish separate vacancies with identical company/city/title.
+
+The versioned, plain-data record schema is suitable for a later JSON/CSV exporter without storing job descriptions:
+
+```text
+schemaVersion: 2
+canonicalKey: string
+seekIds: string[]
+url: canonical SEEK URL (no tracking parameters), or empty when no ID exists
+title, company, city: strings
+mark: NONE | SKIP | SAVED | APPLIED
+markChangedAt: Unix milliseconds or null
+lastViewedAt: Unix milliseconds or null
+firstSeenAt, lastSeenAt, updatedAt: Unix milliseconds
+```
+
+Viewed state is derived from a non-null `lastViewedAt`. `lastSeenAt` is observation metadata, never a retention anchor. Clearing/expiring a mark may retain its historical `markChangedAt` while viewed memory remains; NONE has no active mark expiry. There are no export buttons, sync integrations, or external tool calls in this version.
+
+## Source and DOM maintenance
 
 | File | Responsibility |
 | --- | --- |
-| `src/seek-extractor.js` | All SEEK selectors, card/detail extraction, Markdown generation. |
-| `src/state.js` | Pure identity, transitions, deduplication and expiry. |
-| `src/background.js` | Serialized storage writes and opportunistic cleanup. |
-| `src/storage.js` | Content-script messaging client. |
-| `src/content.js` | Dynamic DOM processing, navigation, filtering and actions. |
-| `src/ui.js`, `src/styles.css` | Small accessible controls, badges and feedback. |
-| `options/` | Local memory list, retention preferences and confirmed maintenance actions. |
+| `src/state.js` | Identity, schema migration, independent marks/views, filters and expiry. |
+| `src/background.js` | Serialized local storage writes and cleanup. |
+| `src/storage.js` | Content/options messaging client. |
+| `src/seek-extractor.js` | Centralized SEEK selectors and card/detail recognition. |
+| `src/content.js` | Navigation, dynamic cards, filtering, automatic views. |
+| `src/ui.js`, `src/styles.css` | Compact mark menus, filters and feedback. |
+| `options/` | Memory management and settings. |
 
-DOM assumptions are centralized in `EasySeekExtractor.selectors`:
+Cards are recognized through `/job/{ID}` links inside semantic `article` elements or known job-card markers. A candidate must contain only one distinct job ID. Title/company/location use centralized `data-automation`/`data-testid` selectors and semantic heading links.
 
-- Cards have `/job/{ID}` anchors inside an `article`, `data-testid="job-card"`, or `data-automation="normalJob"/"premiumJob"`. A card must contain only one distinct job ID. Title prefers `jobTitle`, then semantic heading links. Company/location prefer `jobCompany`/`jobLocation`.
-- Detail titles prefer `job-detail-title` (or a visible `h1` on a standalone detail URL). Descriptions use `jobAdDetails`, `job-description`, or `jobDescription` markers. Both must be visible and share a container smaller than the whole document body. Metadata is scoped to that container, using `advertiser-name`, `job-detail-location`, `job-detail-salary`, and `jobListingDate` alternatives in the selector table.
-- A rendered detail requires a route ID and nonempty title/description. If `data-job-id` is present, it must agree with the route. During SPA navigation the previous unchanged detail is withheld until new content appears. If SEEK reuses the exact same elements and identical text for a different listing, a page refresh may be needed to resolve this conservative guard.
-- A debounced MutationObserver handles inserted/recycled cards and changed text/links. A lightweight 750 ms URL comparison catches History API navigation from the page's isolated execution world. No page navigation, network fetching, or background scraping is performed.
+Details require a visible title and nonempty description in a shared container smaller than the whole document body, plus a route job ID. `data-job-id`, when present, must agree with that ID. Description text is read only to recognize loaded/stale SPA content; it is not stored or copied. The previous unchanged detail is withheld during navigation. Exact reuse of identical DOM/content for another listing can require a refresh.
 
-If SEEK changes markup, edit the extractor selectors and test the actual page before adding broader selectors. Unrecognized cards are left alone; failed/missing details are not marked SEEN. Search controls remain outside hidden cards.
+A debounced MutationObserver handles inserted/recycled cards and changed text/links. A lightweight 750 ms URL check catches History API navigation. Unrecognized cards are left alone; incomplete details are not recorded as viewed. If SEEK markup changes, update the selector table in `seek-extractor.js` and verify on a real page before broadening selectors.
 
-## Verification
-
-Run the dependency-free state and worker tests:
+## Tests and Chrome checklist
 
 ```powershell
 node --test tests/state.test.cjs tests/management.test.cjs
 Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
-Open `tests/browser.html` in Chrome to run a self-contained DOM fixture. The report below the sample jobs becomes PASS or FAIL. It uses the real extraction/content/UI scripts with mocked Chrome storage and clipboard APIs; it does not change extension storage or your clipboard. This covers hiding/recovery, actions, dynamic reposts, malformed cards, SPA navigation, manual Reset, and clipboard success/failure handling.
+`tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: menus, dismissal, all filters, Show Hidden, mark/view independence, aliases, malformed cards, and SPA navigation. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
-`tests/options-browser.html` loads the actual options UI with mocked extension APIs to test search, sorting, state filtering, expiry display, edits, settings and confirmation/cancellation flows. Local file fetches in this fixture require Chrome's `--allow-file-access-from-files` flag when run headlessly.
+Verified: 17 Node tests, JavaScript syntax checks, and both headless Chrome fixtures. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
-Verified during implementation: all 18 Node tests and JavaScript syntax checks passed; both DOM fixtures passed in headless Chrome. **Live SEEK DOM compatibility and real extension clipboard/storage integration remain unverified:** the public SEEK request returned a JavaScript/cookie verification challenge. Fixture success is not a substitute for the live checks below. The Manifest V3 content-script arrangement follows [Chrome's official documentation](https://developer.chrome.com/docs/extensions/develop/concepts/content-scripts).
-
-### Chrome acceptance checklist
-
-1. Load unpacked, open a SEEK search, and confirm a new job is visible with NEW and the EasySeek strip appears.
-2. Open the job and wait for its description; return to search and confirm it is hidden. Reload and repeat in another search/tab.
-3. Enable Show Hidden, confirm SEEN, and Reset it. Turn Show Hidden off; it should remain visible.
-4. Skip a job. Confirm it hides, including in another search and with a changed tracking URL. Use Show Hidden to recover it.
-5. Pursue a role. Confirm it remains visible and marked, including after opening/reloading its detail.
-6. Check an available repost with the same company/city and hyphen/space title variation shares state; a different seniority title must not. Missing company/location should still match by ID.
-7. Load additional cards or change searches without refreshing; confirm actions/filtering appear without duplicates. Try the split detail view and browser Back/Forward.
-8. On a full detail click Analyze with Career Ops and paste into a text editor. Confirm the final paragraph, metadata, canonical URL, and analysis checklist are included. No external application should open.
-9. Open Extension options and check search, status filters, marked/expiry dates, and linked IDs. Apply SEEN/SKIP/PURSUE to a disposable record and confirm its marked time resets. Observe it again on SEEK; only Last seen should change.
-10. Try Never and a shorter retention policy; verify the confirmation and expiry display. Confirm/cancel single removal and bulk cleanup. PURSUE must survive all bulk actions.
-11. For a disposable record with the default 60-day policy, use the service-worker console to set `statusChangedAt` to `Date.now() - 61 * 86400000`, then reload SEEK or Refresh options. SEEN/SKIP should disappear from storage even if `lastSeenAt` is recent; PURSUE should remain. Automated tests also cover the exact expiry boundary.
-
-V1 intentionally includes no dashboard, alerts integration, cloud sync, AI calls, job archive, or application automation.
+1. Confirm only Hide Skip is enabled by default. Open a new job: it gains Viewed and remains visible.
+2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
+3. Toggle each filter. Show Hidden should reveal every loaded card, including those matching several filters. Clear a hidden job's mark and confirm viewed history remains.
+4. Test reposts/tracking URLs, dynamic cards, split details, and Back/Forward navigation. Confirm no duplicate controls.
+5. Open Memory from both entry points. Combine mark/viewed filters, search, change and clear marks, remove a disposable record, and confirm updates reach an open SEEK tab.
+6. Set Saved/Applied to finite retention and Viewed/Skip to Never, save, and inspect both expiry dates. Test shorter-policy confirmation and expired-memory cleanup with disposable data.
+7. If upgrading, confirm old PURSUE becomes SAVED and old SEEN becomes viewed-only. Confirm there is no Career Ops copy control or clipboard permission.

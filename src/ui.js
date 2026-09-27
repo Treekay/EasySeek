@@ -12,28 +12,47 @@
     node.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); callback(); });
     return node;
   }
-  function actions(onAction, onCopy) {
+  function actions(onAction) {
     const node = element('div', '', 'easyseek-actions');
     node.dataset.easyseekUi = 'actions';
-    node.setAttribute('aria-label', 'EasySeek job actions');
-    const badge = element('span', 'NEW', 'easyseek-badge');
-    node.append(badge);
-    for (const [label, action] of [['Skip', 'SKIP'], ['Pursue', 'PURSUE'], ['Reset', 'RESET']]) {
-      node.append(button(label, () => onAction(action)));
+    const control = element('details', '', 'easyseek-mark');
+    const summary = element('summary', 'Mark');
+    summary.setAttribute('aria-label', 'Change job mark');
+    const menu = element('div', '', 'easyseek-menu');
+    menu.setAttribute('aria-label', 'Choose job mark');
+    const choices = [];
+    for (const [label, mark] of [['Saved', 'SAVED'], ['Applied', 'APPLIED'], ['Skip', 'SKIP'], ['Clear mark', 'NONE']]) {
+      const choice = button(label, () => { control.open = false; summary.focus(); onAction(mark); });
+      choice.dataset.mark = mark; choices.push(choice); menu.append(choice);
     }
-    if (onCopy) node.append(button('Analyze with Career Ops', onCopy));
-    return { node, update(status) { badge.textContent = status; node.dataset.state = status; } };
+    control.append(summary, menu);
+    control.addEventListener('click', event => event.stopPropagation());
+    control.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { control.open = false; summary.focus(); event.stopPropagation(); }
+    });
+    const viewed = element('span', '', 'easyseek-viewed');
+    node.append(control, viewed);
+    return { node, update(state) {
+      summary.textContent = { NONE: 'Mark', SAVED: 'Saved', APPLIED: 'Applied', SKIP: 'Skip' }[state.mark];
+      node.dataset.mark = state.mark;
+      viewed.textContent = state.viewed ? 'Viewed' : '';
+      for (const choice of choices) choice.setAttribute('aria-pressed', String(choice.dataset.mark === state.mark));
+    } };
   }
+  document.addEventListener('click', event => {
+    for (const menu of document.querySelectorAll('.easyseek-mark[open]')) if (!menu.contains(event.target)) menu.open = false;
+  });
   function controls(onChange) {
     const node = element('aside', '', 'easyseek-controls');
     node.dataset.easyseekUi = 'controls';
     node.setAttribute('aria-label', 'EasySeek search filters');
     node.append(element('strong', 'EasySeek'));
     const inputs = {};
-    for (const [key, title] of [['hideSeen', 'Hide Seen'], ['hideSkipped', 'Hide Skipped'], ['showHidden', 'Show Hidden']]) {
+    for (const [key, title] of [['hideSkipped', 'Hide Skip'], ['hideApplied', 'Hide Applied'], ['hideSaved', 'Hide Saved'], ['hideViewed', 'Hide Viewed'], ['showHidden', 'Show Hidden']]) {
       const label = element('label');
       const input = element('input');
       input.type = 'checkbox';
+      input.dataset.filter = key;
       input.addEventListener('change', () => onChange(key, input.checked));
       label.append(input, document.createTextNode(title));
       inputs[key] = input;

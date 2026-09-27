@@ -1,45 +1,36 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EasySeek — Manage memory</title>
-  <link rel="stylesheet" href="options.css">
-  <script defer src="../src/state.js"></script>
-  <script defer src="../src/storage.js"></script>
-  <script defer src="options.js"></script>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EasySeek Memory</title><link rel="stylesheet" href="options.css">
+  <script defer src="../src/state.js"></script><script defer src="../src/storage.js"></script><script defer src="options.js"></script>
 </head>
-<body>
-<main>
-  <header><h1>EasySeek</h1><p>Your remembered jobs, stored only in this Chrome profile.</p></header>
+<body><main>
+  <header><h1>EasySeek Memory</h1><p>Your viewed jobs and marks, stored only in this Chrome profile.</p></header>
   <p id="feedback" role="status" aria-live="polite">Loading…</p>
   <section aria-labelledby="memory-heading">
     <h2 id="memory-heading">Memory</h2>
     <div class="toolbar">
       <label>Search title or company<input id="search" type="search" placeholder="Search remembered jobs"></label>
-      <label>Status<select id="filter"><option value="">All</option><option>SEEN</option><option>SKIP</option><option>PURSUE</option></select></label>
+      <label>Mark<select id="filter"><option value="">All marks</option><option>NONE</option><option>SKIP</option><option>SAVED</option><option>APPLIED</option></select></label>
+      <label>Viewed<select id="viewedFilter"><option value="">All jobs</option><option value="yes">Viewed</option><option value="no">Not viewed</option></select></label>
       <button id="refresh" type="button">Refresh</button>
-    </div>
-    <p id="count"></p>
-    <div id="records"></div>
+    </div><p id="count"></p><div id="records"></div>
   </section>
   <section aria-labelledby="settings-heading">
     <h2 id="settings-heading">Settings</h2>
-    <p>Retention starts when a status is assigned. Repeated SEEK appearances do not extend it. PURSUE is always kept until you change or remove it.</p>
+    <p>Viewed history and user marks are independent. Opening a job never changes its mark. Search appearances never extend retention.</p>
     <form id="settings">
-      <div class="toolbar">
-        <label>Seen memory<select id="seenDays"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">180 days</option><option value="never">Never</option></select></label>
-        <label>Skipped memory<select id="skipDays"><option value="30">30 days</option><option value="60">60 days</option><option value="90">90 days</option><option value="180">180 days</option><option value="never">Never</option></select></label>
-        <button type="submit">Save settings</button>
-      </div>
-      <p class="hint">Saving applies the new policy immediately. A shorter duration may permanently remove older records; their original marked dates stay unchanged.</p>
+      <h3>Memory duration</h3><div id="retention" class="toolbar"></div>
+      <p class="hint">Marks expire from their marked date; viewed history expires from the last actual opening. Expiry clears only that part of memory. Records disappear when neither part remains.</p>
+      <h3>Search filters</h3><div id="filters" class="toolbar"></div>
+      <p class="hint">Any enabled filter can hide a job. Show Hidden on SEEK temporarily overrides all filters.</p>
+      <button type="submit">Save settings</button>
     </form>
   </section>
   <section aria-labelledby="maintenance-heading">
     <h2 id="maintenance-heading">Maintenance</h2>
-    <p>Removing memory makes those jobs NEW again. Bulk removal cannot be undone.</p>
-    <div class="toolbar"><button type="button" data-bulk="EXPIRED">Clear expired records now</button><button type="button" data-bulk="SEEN">Clear all SEEN</button><button type="button" data-bulk="SKIP">Clear all SKIP</button></div>
+    <p>Clear expired marks and viewed history using your current settings. Unexpired information is kept.</p>
+    <button type="button" id="cleanup">Clear expired memory now</button>
   </section>
-</main>
-</body>
-</html>
+</main></body></html>

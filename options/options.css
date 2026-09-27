@@ -17,10 +17,14 @@ button:disabled { opacity: .55; cursor: wait; }
 .record { padding: 18px 0; border-top: 1px solid #dce3e8; }
 .record p { margin: 6px 0; overflow-wrap: anywhere; }
 .badge { display: inline-block; font-size: 12px; font-weight: 700; border-radius: 4px; background: #edf1f5; padding: 2px 6px; }
-.badge[data-state="PURSUE"] { color: #17634f; background: #e5f3ed; }
+.badge[data-state="SAVED"] { color: #17634f; background: #e5f3ed; }
 .badge[data-state="SKIP"] { color: #873c30; background: #f9efeb; }
 .hint, .dates, #count { color: #536174; font-size: 13px; }
 #feedback { min-height: 24px; color: #17634f; }
 #feedback[data-error="true"] { color: #a12323; }
 .actions { margin-top: 12px; }
 @media (max-width: 500px) { main { padding: 0 12px 24px; } section { padding: 16px; } .toolbar label { width: 100%; } }
+
+.badge[data-state="APPLIED"] { color: #394d91; background: #edf0fc; }
+#filters label { display: flex; align-items: center; gap: 6px; }
+#settings h3 { margin: 16px 0 10px; }

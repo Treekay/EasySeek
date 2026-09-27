@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const S = EasySeekState, E = EasySeekExtractor, UI = EasySeekUI, store = EasySeekStorage;
-  let records = [], preferences = { hideSeen: true, hideSkipped: true }, showHidden = false;
+  let records = [], preferences = S.preferences(), showHidden = false;
   let ready = false, running = false, rerun = false, timer, panel, detailUI;
   let route = location.href, opened = '', previousDetail = null, staleDetail = null;
   const mounted = new Map(), observed = new Set();
@@ -16,7 +16,7 @@
       const data = await store.request('action', { job: memoryJob(job), action });
       records = data.records;
       schedule();
-      UI.notify(action === 'RESET' ? 'Reset to NEW' : 'Marked ' + action);
+      UI.notify(action === 'NONE' ? 'Mark cleared' : 'Marked ' + action);
     } catch (error) { fail(error); }
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, 120); }
@@ -37,15 +37,6 @@
     return staleDetail && detail.descriptionNode === staleDetail.descriptionNode &&
       detail.job.title === staleDetail.job.title && detail.job.description === staleDetail.job.description;
   }
-  async function copy() {
-    try {
-      onRoute();
-      const detail = E.detail();
-      if (!detail || isStale(detail)) throw new Error('Wait for the job description to finish loading.');
-      await navigator.clipboard.writeText(E.markdown(detail.job));
-      UI.notify('Copied for Career Ops');
-    } catch (error) { fail(new Error('Could not copy. ' + error.message)); }
-  }
   async function scan() {
     if (!ready) return;
     if (running) { rerun = true; return; }
@@ -56,7 +47,7 @@
       const cards = E.cards();
       for (const [node, controls] of mounted) {
         if (!cards.has(node)) {
-          node.classList.remove('easyseek-hidden', 'easyseek-pursue'); controls.node.remove(); mounted.delete(node);
+          node.classList.remove('easyseek-hidden', 'easyseek-saved', 'easyseek-applied'); controls.node.remove(); mounted.delete(node);
         }
       }
       let hidden = 0;
@@ -69,14 +60,15 @@
         }
         if (!node.contains(controls.node)) node.append(controls.node);
         controls.job = job;
-        const status = S.status(records, job);
-        controls.update(status);
-        const hide = !showHidden && ((status === 'SEEN' && preferences.hideSeen) || (status === 'SKIP' && preferences.hideSkipped));
+        const state = S.getState(records, job);
+        controls.update(state);
+        const hide = S.hidden(state, preferences, showHidden);
         node.classList.toggle('easyseek-hidden', hide);
-        node.classList.toggle('easyseek-pursue', status === 'PURSUE');
+        node.classList.toggle('easyseek-saved', state.mark === 'SAVED');
+        node.classList.toggle('easyseek-applied', state.mark === 'APPLIED');
         if (hide) hidden++;
-        const token = JSON.stringify([job.id, S.identity(job).canonicalKey, status]);
-        if (status !== 'NEW' && !observed.has(token)) { observed.add(token); toObserve.push(memoryJob(job)); }
+        const token = JSON.stringify([job.id, S.identity(job).canonicalKey, state.mark, state.viewed]);
+        if ((state.mark !== 'NONE' || state.viewed) && !observed.has(token)) { observed.add(token); toObserve.push(memoryJob(job)); }
       }
       if (cards.size) {
         if (!panel) panel = UI.controls(async (key, value) => {
@@ -97,15 +89,15 @@
         staleDetail = null;
         if (!detailUI || !detail.node.contains(detailUI.node)) {
           detailUI?.node.remove();
-          detailUI = UI.actions(action => act(detailUI.job, action), copy);
+          detailUI = UI.actions(action => act(detailUI.job, action));
           detail.heading.insertAdjacentElement('afterend', detailUI.node);
         }
         detailUI.job = detail.job;
-        detailUI.update(S.status(records, detail.job));
+        detailUI.update(S.getState(records, detail.job));
         if (opened !== detail.job.id) {
           opened = detail.job.id;
           // Enqueue synchronously before any later click; the worker preserves manual decisions.
-          store.request('action', { job: memoryJob(detail.job), action: 'SEEN' })
+          store.request('action', { job: memoryJob(detail.job), action: 'VIEW' })
             .then(data => { records = data.records; schedule(); }).catch(error => { opened = ''; fail(error); });
         }
       } else { detailUI?.node.remove(); detailUI = null; }
@@ -123,7 +115,7 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.records) records = changes.records.newValue || [];
-    if (changes.preferences) preferences = { hideSeen: true, hideSkipped: true, ...changes.preferences.newValue };
+    if (changes.preferences) preferences = S.preferences(changes.preferences.newValue);
     schedule();
   });
   window.addEventListener('popstate', schedule);

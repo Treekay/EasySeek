@@ -18,10 +18,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     else if (message.type === 'observe') {
       for (const job of message.jobs || []) records = EasySeekState.apply(records, job, 'OBSERVE');
     } else if (message.type === 'preferences') {
-      for (const key of ['hideSeen', 'hideSkipped']) {
+      for (const key of EasySeekState.filterKeys) {
         if (typeof message.preferences?.[key] === 'boolean') preferences[key] = message.preferences[key];
       }
-      for (const key of ['seenDays', 'skipDays']) {
+      for (const key of EasySeekState.retentionKeys) {
         if (Object.prototype.hasOwnProperty.call(message.preferences || {}, key)) {
           if (!isOptions || !EasySeekState.validDays(message.preferences[key])) throw new Error('Retention must be Never or 1–36500 whole days.');
           preferences[key] = message.preferences[key];
@@ -32,8 +32,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       records = EasySeekState.manage(records, message.key, message.action, now);
     } else if (message.type === 'bulk' && isOptions) {
       if (message.confirmed !== true) throw new Error('Confirmation required');
-      if (message.action === 'SEEN' || message.action === 'SKIP') records = records.filter(record => record.status !== message.action);
-      else if (message.action !== 'EXPIRED') throw new Error('Invalid bulk action');
+      if (message.action !== 'EXPIRED') throw new Error('Invalid bulk action');
     } else if (message.type !== 'read') throw new Error('Unknown request');
     const changes = {};
     if (JSON.stringify(records) !== JSON.stringify(stored.records || [])) changes.records = records;

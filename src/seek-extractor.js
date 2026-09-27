@@ -52,15 +52,5 @@
       description: text(description)
     } };
   }
-  function markdown(job) {
-    const field = value => String(value || 'Not available').replace(/[\r\n]+/g, ' ');
-    return '# Job Analysis Request\n\n## Job\n\n' +
-      [['Title', job.title], ['Company', job.company], ['Location', job.location], ['Salary', job.salary], ['Posted', job.posted], ['Source', 'SEEK'], ['SEEK Job ID', job.id], ['URL', job.url]]
-        .map(([key, value]) => key + ': ' + field(value)).join('\n') +
-      '\n\n## Job Description\n\n' + job.description + '\n\n## Analysis Request\n\n' +
-      'Analyze this role using my existing career-ops profile and workflow.\n\nFocus on:\n' +
-      ['overall fit', 'relevant transferable experience', 'important gaps', 'whether this role is worth pursuing', 'CV tailoring opportunities', 'whether a cover letter is worthwhile', 'networking / recruiter / hiring-manager opportunities', 'recommended application strategy']
-        .map(item => '- ' + item).join('\n') + '\n';
-  }
-  globalThis.EasySeekExtractor = { selectors, cards, detail, markdown };
+  globalThis.EasySeekExtractor = { selectors, cards, detail };
 })();
