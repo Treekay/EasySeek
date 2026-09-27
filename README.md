@@ -1,4 +1,4 @@
-# EasySeek V1
+# EasySeek
 
 A lightweight Manifest V3 Chrome extension for SEEK New Zealand and LinkedIn Jobs browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved** or **Skip**, and track **Applied / Interview / Offered / Rejected**, while keeping each site's own search and detail UI.
 
