@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.4.1** refines the Memory settings icon with a symmetric eight-tooth gear. LinkedIn Jobs support was added alongside SEEK in **1.4.0**. Chrome may request approval for the added LinkedIn site access when updating. Reload the extension and your SEEK tabs after updating.
+Version **1.4.2** fixes LinkedIn detail recognition for h2/link-only job titles and empty or hidden loading panels, so loaded details can enable Copy, Export and Mark. Title and description are paired within the same detail panel, with conflicting job IDs still rejected. LinkedIn Jobs support was added alongside SEEK in **1.4.0**. Chrome may request approval for the added LinkedIn site access when updating. Reload the extension and your SEEK tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 

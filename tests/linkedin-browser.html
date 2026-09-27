@@ -33,6 +33,23 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(realDetail(document, 'https://www.linkedin.com/jobs/view/engineer-at-xero-123').job.id === '123', 'standalone slug detail');
   assert(realDetail(document, 'https://www.linkedin.com/jobs/search/?currentJobId=999') === null, 'stale ID evidence rejected');
   const button = key => document.querySelector(`[data-action="${key}"]`);
+  // A split-view heading need not be an h1. Empty/stale panels must not
+  // prevent the selected detail from enabling all three job actions.
+  const title = detail.querySelector('.job-details-jobs-unified-top-card__job-title');
+  const originalTitle = title.innerHTML;
+  title.innerHTML = '<h2><a href="https://www.linkedin.com/jobs/view/123/">Full-Stack Engineer</a></h2>';
+  const placeholders = document.createElement('section');
+  placeholders.innerHTML = '<div class="job-details-jobs-unified-top-card__job-title"></div><div class="jobs-description-content__text"></div><div style="visibility:hidden"><h1 class="jobs-unified-top-card__job-title">Hidden title</h1><div class="jobs-description-content__text">Hidden body</div></div>';
+  document.querySelector('main').prepend(placeholders);
+  await pause();
+  for (const key of ['copy', 'export', 'mark']) assert(!button(key).disabled, key + ' enabled for h2 split detail with placeholders');
+  assert(realDetail(document, 'https://www.linkedin.com/jobs/search/?currentJobId=123').job.title === 'Full-Stack Engineer', 'selected panel paired correctly');
+  title.innerHTML = '<a href="https://www.linkedin.com/jobs/view/123/">Full-Stack Engineer</a>';
+  assert(realDetail(document, 'https://www.linkedin.com/jobs/collections/recommended/').job.id === '123', 'direct title link without h1 or route ID');
+  const wrapper = document.createElement('a'); wrapper.href = 'https://www.linkedin.com/jobs/view/999/';
+  title.replaceWith(wrapper); wrapper.append(title); title.textContent = 'Old title';
+  assert(realDetail(document, 'https://www.linkedin.com/jobs/search/?currentJobId=123') === null, 'ancestor title link mismatch rejected');
+  wrapper.replaceWith(title); title.innerHTML = originalTitle; placeholders.remove(); await pause();
   assert(records[0].platform === 'linkedin' && records[0].lastViewedAt !== null, 'automatic view from explicit detail evidence');
   button('mark').click(); button('mark-SKIP').click(); await pause();
   assert(card.classList.contains('easyseek-hidden') && records[0].mark === 'SKIP', 'skip hides card');
