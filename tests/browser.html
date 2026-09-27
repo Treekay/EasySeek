@@ -50,14 +50,21 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   const markedAt = records[0].markChangedAt;
   await navigate('?search=again'); await navigate('?jobId=12345678');
   assert(records[0].markChangedAt === markedAt && records[0].mark === 'SAVED', 'opening preserves mark');
-  button('filter').click(); button('hideSaved').click(); await pause();
+  button('filter').click();
+  assert(button('export').querySelector('svg'), 'export icon');
+  assert(button('hideSkipped').getAttribute('aria-pressed') === 'false', 'Skip initially not selected');
+  for (const key of ['hideApplied', 'hideSaved', 'hideViewed']) assert(button(key).getAttribute('aria-pressed') === 'true', 'shown type selected');
+  assert(!rail.querySelector('[data-action="showHidden"]'), 'no Show Hidden control');
+  button('hideSaved').click(); await pause();
   assert(!menu('filter').hidden && preferences.hideSaved && card.classList.contains('easyseek-hidden'), 'filter stays open and persists');
-  button('showHidden').click(); await pause(); assert(!card.classList.contains('easyseek-hidden'), 'Show Hidden override');
+  assert(button('hideSaved').getAttribute('aria-pressed') === 'false', 'unselected Saved hidden');
+  button('hideSaved').click(); await pause(); assert(!card.classList.contains('easyseek-hidden'), 'select Saved restores job');
   button('memory').click(); await pause(); assert(memoryOpened === 1, 'Memory access');
   button('hideViewed').click(); await pause(); assert(preferences.hideViewed, 'viewed toggle');
   button('hideApplied').click(); await pause(); assert(preferences.hideApplied, 'applied toggle');
   button('hideSkipped').click(); await pause(); assert(!preferences.hideSkipped, 'skip toggle');
-  button('hideViewed').click(); await pause(); button('hideApplied').click(); await pause(); button('hideSaved').click(); await pause();
+  button('hideViewed').click(); await pause(); button('hideApplied').click(); await pause();
+  assert(S.filterKeys.every(key => !preferences[key]), 'all selected shows every type');
   rail.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); assert(menu('filter').hidden, 'Escape closes');
   button('filter').click(); document.body.click(); assert(menu('filter').hidden, 'outside click closes');
   let copied = '', exported = null, downloaded = '';
@@ -92,6 +99,6 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   EasySeekExtractor.detail = extract;
   await navigate('?no-detail'); for (const action of ['copy', 'export', 'mark']) assert(button(action).disabled, 'leaving detail disables ' + action);
   assert(document.querySelectorAll('.easyseek-rail').length === 1, 'single rail across SPA changes');
-  document.querySelector('#report').textContent = 'PASS: floating placement, no inline controls, left menus, marks, persistent filters, Show Hidden, copy/export Markdown, disabled/stale contexts, aliases, SPA, full detail, Memory access';
+  document.querySelector('#report').textContent = 'PASS: floating placement, no inline controls, left menus, marks, positive visibility filters, copy/export Markdown, disabled/stale contexts, aliases, SPA, full detail, Memory access';
 })().catch(error => document.querySelector('#report').textContent = 'FAIL: ' + error.stack);
 </script></html>

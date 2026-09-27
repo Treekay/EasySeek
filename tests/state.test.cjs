@@ -122,11 +122,11 @@ test('each retention setting supports finite or Never without rewriting timestam
   assert.equal(S.cleanup(records, 400 * S.DAY, { viewedDays: null }).length, 1);
   assert.equal(S.cleanup(records, 30 * S.DAY, { viewedDays: 30 }).length, 0);
 });
-test('all filters independent, default only Skip, Show Hidden overrides all', () => {
+test('all filters independent, default only Skip, selecting all types shows everything', () => {
   for (const mark of S.marks) for (const viewed of [true, false]) {
     assert.equal(S.hidden({ mark, viewed }, {}), mark === 'SKIP');
     assert.equal(S.hidden({ mark, viewed }, { hideViewed: true }), mark === 'SKIP' || viewed);
-    assert.equal(S.hidden({ mark, viewed }, { hideSaved: true, hideApplied: true, hideViewed: true }, true), false);
+    assert.equal(S.hidden({ mark, viewed }, { hideSkipped: false, hideSaved: false, hideApplied: false, hideViewed: false }), false);
   }
   assert.equal(S.hidden({ mark: 'APPLIED', viewed: false }, { hideApplied: true }), true);
   assert.equal(S.hidden({ mark: 'SAVED', viewed: false }, { hideSaved: true }), true);

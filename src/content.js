@@ -1,7 +1,7 @@
 (function () {
   'use strict';
   const S = EasySeekState, E = EasySeekExtractor, UI = EasySeekUI, store = EasySeekStorage;
-  let records = [], preferences = S.preferences(), showHidden = false;
+  let records = [], preferences = S.preferences();
   let ready = false, running = false, rerun = false, timer, rail;
   let route = location.href, opened = '', previousDetail = null, staleDetail = null;
   const mounted = new Set(), observed = new Set();
@@ -25,7 +25,7 @@
     const oldId = S.jobId(route) || new URL(route).searchParams.get('jobId');
     const newId = S.jobId(location.href) || new URL(location.href).searchParams.get('jobId');
     route = location.href;
-    observed.clear(); showHidden = false;
+    observed.clear();
     if (oldId === newId) return;
     opened = '';
     // A SPA can change its URL before replacing the previous job body.
@@ -59,7 +59,6 @@
     try { act(requireJob(), value); } catch (error) { fail(error); }
   }
   async function filter(key, value) {
-    if (key === 'showHidden') { showHidden = value; schedule(); return; }
     try {
       const data = await store.request('preferences', { preferences: { [key]: value } });
       preferences = data.preferences; schedule();
@@ -83,7 +82,7 @@
       for (const [node, job] of cards) {
         mounted.add(node);
         const state = S.getState(records, job);
-        const hide = S.hidden(state, preferences, showHidden);
+        const hide = S.hidden(state, preferences);
         node.classList.toggle('easyseek-hidden', hide);
         node.classList.toggle('easyseek-saved', state.mark === 'SAVED');
         node.classList.toggle('easyseek-applied', state.mark === 'APPLIED');
@@ -95,7 +94,7 @@
         memory: () => store.request('openOptions').catch(fail) });
       if (!rail.node.isConnected) document.body.append(rail.node);
       const detail = activeDetail();
-      rail.update(detail?.job, detail ? S.getState(records, detail.job) : { mark: 'NONE', viewed: false }, preferences, showHidden, cards.size - hidden, hidden);
+      rail.update(detail?.job, detail ? S.getState(records, detail.job) : { mark: 'NONE', viewed: false }, preferences, cards.size - hidden, hidden);
       if (detail && !isStale(detail)) {
         previousDetail = detail;
         staleDetail = null;

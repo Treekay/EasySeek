@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.3.1** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
+Version **1.3.2** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -27,14 +27,14 @@ These are independent concepts:
 
 ## Floating action rail
 
-The right-middle edge of the viewport has four compact, fixed 40 × 40 px square buttons. Copy uses a clipboard icon, Mark a pencil, and Filter a funnel; accessible names and hover tooltips identify each action. Submenu buttons are also square. There are no injected action bars inside cards or detail panels.
+The right-middle edge of the viewport has four compact, fixed 40 × 40 px square buttons. Copy uses a clipboard icon, Export a download icon, Mark a pencil, and Filter a funnel; accessible names and hover tooltips identify each action. Submenu buttons are also square. There are no injected action bars inside cards or detail panels.
 
 - **Copy JD** (blue) copies the active job as structured Markdown and shows “Copied” after success.
-- **.md** (green) downloads the same Markdown as `company-title-seekJobId.md`.
+- **Export JD** (green download icon) downloads the same Markdown as `company-title-seekJobId.md`.
 - **Mark** opens three equal-sized buttons to its left: **Skip / Saved / Applied**. Selecting one closes the menu. The pencil icon color and tooltip reflect the current mark; its tooltip also shows whether the job was viewed. Saved and Applied cards retain subtle outlines.
-- **Filter** opens four independent toggle buttons to its left. Selected toggles have a blue active state. This menu stays open for repeated changes; Escape, clicking outside, or clicking Filter again closes it. Small **Show Hidden** and **Memory** buttons sit beneath the toggles. The Filter tooltip reports loaded cards shown/hidden.
+- **Filter** opens four independent toggle buttons to its left. Selected toggles have a blue state and a check: they indicate which types of jobs are shown. This menu stays open for repeated changes; Escape, clicking outside, or clicking Filter again closes it. A **Memory** button sits beneath the toggles. The Filter tooltip reports loaded cards shown/hidden.
 
-The rail acts on a full detail page or the active split-view detail pane. Without a parseable detail, Copy JD, .md and Mark are disabled; Filter remains available. Each job action reparses the active detail when clicked, and stale content during SPA transitions is withheld. Menus support native button keyboard navigation, visible focus, and Escape to close. On narrow viewports filter buttons shrink to keep the submenu on screen.
+The rail acts on a full detail page or the active split-view detail pane. Without a parseable detail, Copy JD, Export JD and Mark are disabled; Filter remains available. Each job action reparses the active detail when clicked, and stale content during SPA transitions is withheld. Menus support native button keyboard navigation, visible focus, and Escape to close. On narrow viewports filter buttons shrink to keep the submenu on screen.
 
 Copy/download include title, company, location, salary, posted date/age, canonical URL, SEEK ID, and the full visible description. Missing fields say “Not available.” Description paragraphs remain plain text inside structured Markdown. Expand any collapsed job description in SEEK first. Filenames remove filesystem-unsafe characters. Downloads use a temporary local Blob URL, without the downloads permission or a network request; Chrome chooses the destination according to your download settings. “Download started” confirms handoff to Chrome, not that the file has finished saving. Clipboard failures show an error rather than a success message.
 
@@ -44,12 +44,12 @@ Copy/download include title, company, location, salary, posted date/age, canonic
 
 | Filter | Default |
 | --- | --- |
-| Hide Skip | On |
-| Hide Applied | Off |
-| Hide Saved | Off |
-| Hide Viewed | Off |
+| Skip | Not selected (hidden) |
+| Applied | Selected (shown) |
+| Saved | Selected (shown) |
+| Viewed | Selected (shown) |
 
-All four can be changed through the floating Filter menu or Memory settings. Any enabled matching filter can hide a card: for example Hide Viewed can hide a viewed Saved job even when Hide Saved is off. **Show Hidden** temporarily overrides every filter so you can inspect and change hidden jobs. It resets on navigation and is not stored. The Filter tooltip counts refer to currently loaded cards, not total SEEK matches or unique opportunities.
+All four can be changed through the floating Filter menu or Memory settings. Select the types you want to see; deselect to hide them. These remain independent: a viewed Saved job requires both Viewed and Saved to be selected. New, unmarked jobs always remain visible. Select all four to recover every hidden job; the separate Show Hidden override has been removed. Selections persist across pages and tabs. Existing preferences keep their filtering effect; only the UI meaning is inverted, so no data migration is needed. Internally the existing `hide*` preference keys are retained for compatibility. The Filter tooltip counts currently loaded cards, not total SEEK matches or unique opportunities.
 
 Filtering uses reversible CSS classes, never removes SEEK nodes. Settings and record changes propagate to other open SEEK tabs through storage events. A single background writer serializes updates from all tabs.
 
@@ -92,7 +92,7 @@ Migration is automatic and idempotent:
 
 Old SKIP/PURSUE records cannot reliably tell whether you opened the detail or merely saw a card. Migration does not invent viewed history for these records. Identity, linked IDs, title/company/city and observation timestamps are preserved. Missing new fields alone do not cause deletion; cleanup runs after migration under the current policies.
 
-Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old Hide Seen behavior is retired: Hide Viewed starts off. Existing Hide Skipped preference is retained. New Saved/Applied retention defaults to Never and their filters start off.
+Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old Hide Seen behavior is retired: Viewed starts selected (shown). Existing Skip visibility preference is retained. New Saved/Applied retention defaults to Never and their visibility controls start selected.
 
 ## Identity and schema
 
@@ -142,13 +142,13 @@ node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs
 Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
-`tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, all filters, Show Hidden, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
+`tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, positive visibility filters, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
 Verified: 23 Node tests, JavaScript syntax checks, and both headless Chrome fixtures. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
-1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/.md/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm only Hide Skip is enabled by default. Open a new job: it gains Viewed and remains visible.
+1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/Export JD/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm Skip is unselected and Applied/Saved/Viewed are selected by default. Open a new job: it gains Viewed and remains visible.
 2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
-3. Toggle each filter. Show Hidden should reveal every loaded card, including those matching several filters. Use Filter → Memory to clear a hidden job's mark and confirm viewed history remains.
+3. Toggle each visibility option. Selecting all four should reveal every loaded card, including those matching multiple types. Use Filter → Memory to clear a hidden job's mark and confirm viewed history remains.
 4. Test reposts/tracking URLs, dynamic cards, split details, and Back/Forward navigation. Confirm no duplicate controls.
 5. Open Memory from both entry points. Combine mark/viewed filters, search, change and clear marks, remove a disposable record, and confirm updates reach an open SEEK tab.
 6. Set Saved/Applied to finite retention and Viewed/Skip to Never, save, and inspect both expiry dates. Test shorter-policy confirmation and expired-memory cleanup with disposable data.

@@ -30,3 +30,6 @@
 @media (max-height: 360px) { .easyseek-rail { gap: 4px; } .easyseek-rail .easyseek-main { height: 40px; } }
 
 .easyseek-main svg { width: 19px; height: 19px; display: block; flex: none; }
+
+.easyseek-filter-toggles button { position: relative; }
+.easyseek-filter-toggles button[aria-pressed="true"]::after { content: "✓"; position: absolute; top: 1px; right: 3px; font-size: 9px; line-height: 1; }

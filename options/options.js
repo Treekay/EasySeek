@@ -13,7 +13,7 @@
     }
     label.append(select); $('retention').append(label);
   }
-  for (const [key, title] of [['hideSkipped', 'Hide Skip'], ['hideApplied', 'Hide Applied'], ['hideSaved', 'Hide Saved'], ['hideViewed', 'Hide Viewed']]) {
+  for (const [key, title] of [['hideSkipped', 'Skip'], ['hideApplied', 'Applied'], ['hideSaved', 'Saved'], ['hideViewed', 'Viewed']]) {
     const label = node('label', title), input = node('input', ''); input.type = 'checkbox'; input.id = key; label.prepend(input); $('filters').append(label);
   }
   function renderSettings() {
@@ -23,7 +23,7 @@
       if (![...$(key).options].some(option => option.value === value)) { const option = node('option', value + ' days'); option.value = value; $(key).append(option); }
       $(key).value = value;
     }
-    for (const key of S.filterKeys) $(key).checked = preferences[key];
+    for (const key of S.filterKeys) $(key).checked = !preferences[key];
   }
   function render() {
     const search = $('search').value.trim().toLowerCase(), filter = $('filter').value, viewed = $('viewedFilter').value;
@@ -78,7 +78,7 @@
   $('settings').addEventListener('submit', event => {
     event.preventDefault();
     const next = Object.fromEntries(S.retentionKeys.map(key => [key, $(key).value === 'never' ? null : Number($(key).value)]));
-    for (const key of S.filterKeys) next[key] = $(key).checked;
+    for (const key of S.filterKeys) next[key] = !$(key).checked;
     const shorter = S.retentionKeys.some(key => next[key] !== null && (preferences[key] === null || next[key] < preferences[key]));
     if (shorter && !confirm('Apply shorter retention? Older marks or viewed history may expire immediately. Their timestamps will not change. This cannot be undone.')) return;
     run('preferences', { preferences: next }, 'Settings saved.');

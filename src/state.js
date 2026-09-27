@@ -83,9 +83,9 @@
     const found = matches(records, job);
     return { mark: winner(found)?.mark || 'NONE', viewed: found.some(record => timestamp(record.lastViewedAt)) };
   }
-  function hidden(state, settings, showHidden = false) {
+  function hidden(state, settings) {
     const prefs = preferences(settings);
-    return !showHidden && ((state.mark === 'SKIP' && prefs.hideSkipped) ||
+    return ((state.mark === 'SKIP' && prefs.hideSkipped) ||
       (state.mark === 'SAVED' && prefs.hideSaved) || (state.mark === 'APPLIED' && prefs.hideApplied) ||
       (state.viewed && prefs.hideViewed));
   }

@@ -49,7 +49,7 @@ const assert = (value, message) => { if (!value) throw new Error(message); };
   assert(records.length === 2, 'remove confirmed');
   $('viewedFilter').value = ''; $('viewedFilter').dispatchEvent(new win.Event('change'));
   $('viewedDays').value = 'never'; $('skipDays').value = '90'; $('savedDays').value = '30'; $('appliedDays').value = '180';
-  $('hideApplied').checked = true;
+  $('hideApplied').checked = false;
   $('settings').dispatchEvent(new win.Event('submit', { cancelable: true })); await pause();
   assert(preferences.viewedDays === null && preferences.skipDays === 90 && preferences.savedDays === 30 && preferences.appliedDays === 180 && preferences.hideApplied, 'four retentions and filters saved');
   const count = confirmations.length;

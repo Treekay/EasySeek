@@ -17,6 +17,7 @@
     for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) svg.setAttribute(key, value);
     const paths = {
       copy: ['M9 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3', 'M9 2h6v5H9z', 'M8 12h8M8 16h6'],
+      export: ['M12 3v12', 'm7 10 5 5 5-5', 'M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4'],
       mark: ['m16 3 5 5-12 12-6 1 1-6Z', 'm14 5 5 5', 'm4 15 5 5'],
       filter: ['M3 4h18l-7 8v7l-4 2V12Z']
     };
@@ -40,7 +41,7 @@
     for (const [key, label, title] of [['copy', 'Copy JD', 'Copy the current job as Markdown'], ['export', '.md', 'Download the current job as Markdown'], ['mark', 'Mark', 'Mark the current job'], ['filter', 'Filter', 'Filter search results']]) {
       const row = element('div', '', 'easyseek-rail-row');
       buttons[key] = button(label, key, () => key === 'mark' || key === 'filter' ? toggle(key) : handlers[key](), 'easyseek-main easyseek-' + key);
-      if (key !== 'export') buttons[key].replaceChildren(icon(key));
+      buttons[key].replaceChildren(icon(key));
       buttons[key].title = title; buttons[key].setAttribute('aria-label', title);
       row.append(buttons[key]);
       if (key === 'mark' || key === 'filter') {
@@ -56,30 +57,30 @@
       choice.dataset.mark = mark; choices[mark] = choice; panels.mark.append(choice);
     }
     const filterRow = element('div', '', 'easyseek-filter-toggles');
-    for (const [key, label] of [['hideSkipped', 'Hide Skip'], ['hideApplied', 'Hide Applied'], ['hideSaved', 'Hide Saved'], ['hideViewed', 'Hide Viewed']]) {
+    for (const [key, label] of [['hideSkipped', 'Skip'], ['hideApplied', 'Applied'], ['hideSaved', 'Saved'], ['hideViewed', 'Viewed']]) {
       toggles[key] = button(label, key, () => handlers.filter(key, !settings[key]));
+      toggles[key].title = 'Show ' + label + ' jobs';
+      toggles[key].setAttribute('aria-label', 'Show ' + label + ' jobs');
       toggles[key].dataset.filter = key; filterRow.append(toggles[key]);
     }
     const secondary = element('div', '', 'easyseek-filter-tools');
-    toggles.showHidden = button('Show Hidden', 'showHidden', () => handlers.filter('showHidden', !settings.showHidden));
-    toggles.showHidden.dataset.filter = 'showHidden';
-    secondary.append(toggles.showHidden, button('Memory', 'memory', handlers.memory));
+    secondary.append(button('Memory', 'memory', handlers.memory));
     panels.filter.append(filterRow, secondary);
     node.addEventListener('keydown', event => {
       if (event.key === 'Escape') { close(true); event.stopPropagation(); }
     });
     document.addEventListener('click', event => { if (!node.contains(event.target)) close(); });
     node.addEventListener('focusout', event => { if (!node.contains(event.relatedTarget)) close(); });
-    return { node, close, update(detail, state, preferences, showHidden, shown, hidden) {
+    return { node, close, update(detail, state, preferences, shown, hidden) {
       if (contextId !== (detail?.id || '')) { close(); contextId = detail?.id || ''; }
       for (const key of ['copy', 'export', 'mark']) buttons[key].disabled = !detail;
-      settings = { ...preferences, showHidden };
+      settings = { ...preferences };
       buttons.mark.dataset.mark = state.mark;
       buttons.mark.title = detail ? `${detail.title} — ${state.mark}${state.viewed ? ' · Viewed' : ''}` : 'Open a job to mark it';
       buttons.mark.setAttribute('aria-label', detail ? 'Change job mark: ' + state.mark : 'Open a job to mark it');
       buttons.filter.title = `${shown} jobs shown · ${hidden} hidden`;
       for (const [mark, choice] of Object.entries(choices)) choice.setAttribute('aria-pressed', String(state.mark === mark));
-      for (const [key, choice] of Object.entries(toggles)) choice.setAttribute('aria-pressed', String(!!settings[key]));
+      for (const [key, choice] of Object.entries(toggles)) choice.setAttribute('aria-pressed', String(!settings[key]));
     } };
   }
   let feedback;
