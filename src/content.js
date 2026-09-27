@@ -5,9 +5,12 @@
   let ready = false, running = false, rerun = false, timer, rail;
   let route = location.href, opened = '', previousDetail = null, staleDetail = null;
   const mounted = new Set(), observed = new Set();
-  const memoryJob = ({ id, title, company, location, url }) => ({ id, title, company, location, url });
+  const memoryJob = ({ id, platform, title, company, location, url }) => ({ id, platform, title, company, location, url });
   const fail = error => UI.notify('EasySeek: ' + error.message, true);
+  const activePage = () => !E.active || E.active(location.href);
+  const routeId = url => E.routeId ? E.routeId(url) : S.jobId(url) || new URL(url).searchParams.get('jobId');
   async function refresh() {
+    if (!activePage()) { ready = true; schedule(); return; }
     const data = await store.request('read');
     records = data.records; preferences = data.preferences; ready = true; schedule();
   }
@@ -22,8 +25,8 @@
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, 120); }
   function onRoute() {
     if (route === location.href) return;
-    const oldId = S.jobId(route) || new URL(route).searchParams.get('jobId');
-    const newId = S.jobId(location.href) || new URL(location.href).searchParams.get('jobId');
+    const oldId = routeId(route);
+    const newId = routeId(location.href);
     route = location.href;
     observed.clear();
     if (oldId === newId) return;
@@ -39,6 +42,7 @@
   }
   function activeDetail() {
     onRoute();
+    if (!activePage()) return null;
     const detail = E.detail();
     return detail && !isStale(detail) ? detail : null;
   }
@@ -71,6 +75,11 @@
     observer.disconnect();
     try {
       onRoute();
+      if (!activePage()) {
+        rail?.node.remove();
+        for (const node of mounted) node.classList.remove('easyseek-hidden', 'easyseek-saved', 'easyseek-applied');
+        mounted.clear(); return;
+      }
       const cards = E.cards();
       for (const node of mounted) {
         if (!cards.has(node)) {
@@ -108,7 +117,7 @@
       if (toObserve.length) store.request('observe', { jobs: toObserve }).catch(fail);
     } catch (error) { fail(error); }
     finally {
-      observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'data-job-id', 'hidden', 'aria-hidden'] });
+      if (activePage()) observer.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'data-job-id', 'data-occludable-job-id', 'data-entity-urn', 'hidden', 'aria-hidden'] });
       running = false;
       if (rerun) { rerun = false; schedule(); }
     }
@@ -124,7 +133,7 @@
   });
   window.addEventListener('popstate', schedule);
   window.addEventListener('pageshow', () => refresh().catch(fail));
-  // URL polling covers history.pushState in SEEK's isolated main world, without patching it.
-  setInterval(() => { if (location.href !== route) schedule(); }, 750);
+  // URL polling covers site history.pushState without patching the main world.
+  setInterval(() => { if (location.href !== route) refresh().catch(fail); }, 750);
   refresh().catch(fail);
 })();

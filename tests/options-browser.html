@@ -57,6 +57,12 @@ const assert = (value, message) => { if (!value) throw new Error(message); };
   assert(confirmations.length === count + 1 && records.length === 2, 'cleanup cancellation');
   allowConfirm = true; $('cleanup').click(); await pause();
   assert(records.length === 2, 'cleanup keeps unexpired marks');
+  records = S.apply(records, { platform: 'linkedin', id: '1', title: 'LinkedIn Engineer', company: 'Example', location: 'Auckland' }, 'SAVED');
+  $('refresh').click(); await pause();
+  $('search').value = 'LinkedIn'; $('search').dispatchEvent(new win.Event('input'));
+  assert(doc.querySelectorAll('.record').length === 1 && doc.querySelector('.record').textContent.includes('LinkedIn IDs: 1'), 'LinkedIn record rendered with correct source');
+  doc.querySelector('.record select').value = 'APPLIED'; doc.querySelector('.record button').click(); await pause();
+  assert(records.find(record => record.platform === 'linkedin').mark === 'APPLIED', 'LinkedIn management action');
   document.querySelector('#report').textContent = 'PASS: options rendering, sorting, search, filter, safe text, independent viewed filter, expiry, marks, clear mark, remove confirmation, four retention settings, cleanup confirmation';
 })().catch(error => document.querySelector('#report').textContent = 'FAIL: ' + error.stack);
 </script></html>

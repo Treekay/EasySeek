@@ -79,3 +79,13 @@ test('cleanup requires confirmation; default saved/applied survive', async () =>
   assert.equal((await w.send({ type: 'bulk', action: 'SAVED', confirmed: true })).ok, false);
   assert.equal((await w.send({ type: 'bulk', action: 'EXPIRED', confirmed: true })).records.length, 2);
 });
+
+test('LinkedIn Jobs messages accepted, feed and lookalike senders rejected', async () => {
+  const w = worker();
+  for (const url of ['https://www.linkedin.com/jobs/search/?currentJobId=1', 'https://nz.linkedin.com/jobs/view/1/']) {
+    const result = await w.send({ type: 'action', job: { ...job, platform: 'linkedin' }, action: 'SAVED' }, url);
+    assert.equal(result.ok, true); assert.equal(result.records[0].platform, 'linkedin');
+    assert.equal(result.records[0].url, 'https://www.linkedin.com/jobs/view/1/');
+  }
+  for (const url of ['https://www.linkedin.com/feed/', 'https://www.linkedin.com.evil.test/jobs/search/']) assert.equal(await w.send({ type: 'read' }, url), null);
+});

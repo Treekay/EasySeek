@@ -33,7 +33,7 @@
       .sort((a, b) => (b.markChangedAt ?? b.lastViewedAt ?? 0) - (a.markChangedAt ?? a.lastViewedAt ?? 0));
     $('count').textContent = `${visible.length} of ${records.length} remembered opportunities · newest mark first`;
     $('records').replaceChildren();
-    if (!visible.length) $('records').append(node('p', records.length ? 'No matching opportunities.' : 'No remembered jobs yet. Browse SEEK to start.'));
+    if (!visible.length) $('records').append(node('p', records.length ? 'No matching opportunities.' : 'No remembered jobs yet. Browse SEEK or LinkedIn Jobs to start.'));
     for (const record of visible) {
       const row = node('article', ''); row.className = 'record';
       row.append(node('h3', record.title || 'Untitled job'), node('p', [record.company || 'Unknown company', record.city || 'Unknown city'].join(' · ')));
@@ -42,7 +42,7 @@
       const dates = node('p', `Marked: ${record.mark === 'NONE' ? '—' : date(record.markChangedAt)} · Mark expires: ${record.mark === 'NONE' ? '—' : expiry.mark === null ? 'Never' : date(expiry.mark)}`);
       dates.className = 'dates'; row.append(dates);
       row.append(node('p', `Last viewed: ${date(record.lastViewedAt)} · Viewed expires: ${record.lastViewedAt === null ? '—' : expiry.viewed === null ? 'Never' : date(expiry.viewed)}`));
-      row.append(node('p', 'SEEK IDs: ' + (record.seekIds.join(', ') || 'Not available')));
+      row.append(node('p', (S.platformOf(record) === 'linkedin' ? 'LinkedIn IDs: ' : 'SEEK IDs: ') + (S.recordIds(record).join(', ') || 'Not available')));
       const actions = node('div', ''); actions.className = 'actions';
       const label = node('label', 'Change mark'), select = node('select', '');
       select.setAttribute('aria-label', `Mark for ${record.title || 'untitled job'}`);
@@ -52,7 +52,7 @@
       save.addEventListener('click', () => run('manage', { key: S.recordKey(record), action: select.value }, select.value === 'NONE' ? 'Mark cleared. Viewed history is unchanged.' : 'Mark updated. Mark retention starts now.'));
       const remove = node('button', 'Remove record'); remove.type = 'button';
       remove.addEventListener('click', () => {
-        if (confirm(`Remove all memory for “${record.title || 'this job'}”, including its mark, viewed history and linked SEEK IDs? This cannot be undone.`)) run('manage', { key: S.recordKey(record), action: 'REMOVE' }, 'Record removed.');
+        if (confirm(`Remove all memory for “${record.title || 'this job'}”, including its mark, viewed history and linked listing IDs? This cannot be undone.`)) run('manage', { key: S.recordKey(record), action: 'REMOVE' }, 'Record removed.');
       });
       actions.append(label, save, remove); row.append(actions); $('records').append(row);
     }

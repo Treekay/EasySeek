@@ -1,6 +1,6 @@
 # EasySeek V1
 
-A lightweight Manifest V3 Chrome extension for SEEK New Zealand browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved**, **Applied**, or **Skip**, while keeping SEEK's own search and detail UI.
+A lightweight Manifest V3 Chrome extension for SEEK New Zealand and LinkedIn Jobs browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved**, **Applied**, or **Skip**, while keeping each site's own search and detail UI.
 
 Plain JavaScript and CSS, no build step or dependencies. All data stays in `chrome.storage.local` in this Chrome profile. No backend, accounts, cloud sync, analytics, network requests, crawling, application automation, or messages. Full job descriptions are never stored in extension memory. Copy JD and .md download are generated only on request from the current page. There is no Career Ops integration, JSON/CSV memory export, or sync.
 
@@ -8,11 +8,11 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 1. Open `chrome://extensions` and enable **Developer mode**.
 2. Choose **Load unpacked** and select the folder containing `manifest.json` (`F:\code\EasySeek`).
-3. For an existing installation, click **Reload** on EasySeek. Reload open SEEK tabs and the Memory page so they use the new scripts.
+3. For an existing installation, click **Reload** on EasySeek. Reload open SEEK/LinkedIn tabs and the Memory page so they use the new scripts.
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.3.4** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
+Version **1.4.0** adds LinkedIn Jobs support alongside SEEK. Chrome may request approval for the added LinkedIn site access when updating. Reload the extension and your SEEK tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -38,7 +38,7 @@ The right-middle edge of the viewport has five compact, fixed 40 × 40 px square
 
 The rail acts on a full detail page or the active split-view detail pane. Without a parseable detail, Copy JD, Export JD and Mark are disabled; Filter remains available. Each job action reparses the active detail when clicked, and stale content during SPA transitions is withheld. Menus support native button keyboard navigation, visible focus, and Escape to close. On narrow viewports filter buttons shrink to keep the submenu on screen.
 
-Copy/download include title, company, location, salary, posted date/age, canonical URL, SEEK ID, and the full visible description. Missing fields say “Not available.” Description paragraphs remain plain text inside structured Markdown. Expand any collapsed job description in SEEK first. Filenames remove filesystem-unsafe characters. Downloads use a temporary local Blob URL, without the downloads permission or a network request; Chrome chooses the destination according to your download settings. “Download started” confirms handoff to Chrome, not that the file has finished saving. Clipboard failures show an error rather than a success message.
+Copy/download include title, company, location, salary, posted date/age, canonical URL, platform-specific job ID, and the full visible description. Missing fields say “Not available.” Description paragraphs remain plain text inside structured Markdown. Expand any collapsed job description on the site first. Filenames remove filesystem-unsafe characters. Downloads use a temporary local Blob URL, without the downloads permission or a network request; Chrome chooses the destination according to your download settings. “Download started” confirms handoff to Chrome, not that the file has finished saving. Clipboard failures show an error rather than a success message.
 
 **Clear mark** in Memory returns to NONE and preserves any unexpired viewed history. **Remove record** in Memory deletes both the mark and viewed history, including all linked listing IDs. If clearing a mark leaves no viewed history, the empty record is discarded. Selecting a mark again is a new manual decision and restarts its mark retention timer.
 
@@ -53,7 +53,7 @@ Copy/download include title, company, location, salary, posted date/age, canonic
 
 All four can be changed through the floating Filter menu or Memory settings. Select the types you want to see; deselect to hide them. These remain independent: a viewed Saved job requires both Viewed and Saved to be selected. New, unmarked jobs always remain visible. Select all four to recover every hidden job; the separate Show Hidden override has been removed. Selections persist across pages and tabs. Existing preferences keep their filtering effect; only the UI meaning is inverted, so no data migration is needed. Internally the existing `hide*` preference keys are retained for compatibility. The Filter tooltip counts currently loaded cards, not total SEEK matches or unique opportunities.
 
-Filtering uses reversible CSS classes, never removes SEEK nodes. Settings and record changes propagate to other open SEEK tabs through storage events. A single background writer serializes updates from all tabs.
+Filtering uses reversible CSS classes, never removes site nodes. Settings and record changes propagate to other open job tabs through storage events. A single background writer serializes updates from all tabs.
 
 ## Independent retention
 
@@ -68,13 +68,13 @@ Each policy independently offers **30 / 60 / 90 / 180 days / Never** in Memory s
 
 Cleanup clears only the expired part. An expired Skip mark becomes NONE while recent viewed history remains. Expired viewed history does not remove an unexpired Saved/Applied/Skip mark. The record is deleted only when neither a mark nor viewed history remains. Settings changes do not rewrite timestamps and affect the next cleanup, including cleanup performed when saving them. Shortening retention requires confirmation because it may immediately discard older memory. Extending a policy cannot recover information already removed.
 
-Cleanup is opportunistic on background requests, including SEEK load/pageshow, Memory opening/Refresh, and Clear expired memory. No scheduled task is installed; an idle tab need not update at the exact expiry instant.
+Cleanup is opportunistic on background requests, including job-page load/pageshow, Memory opening/Refresh, and Clear expired memory. No scheduled task is installed; an idle tab need not update at the exact expiry instant.
 
 ## EasySeek Memory
 
 Open **chrome://extensions → EasySeek → Details → Extension options**, or click **Memory (gear icon)** in the floating rail.
 
-- Inspect every remembered opportunity: title, company, city, mark, marked date, mark expiry, last viewed date, viewed expiry, and linked SEEK IDs.
+- Inspect every remembered opportunity: title, company, city, mark, marked date, mark expiry, last viewed date, viewed expiry, and linked platform-specific listing IDs.
 - Search title/company and combine a mark filter (including NONE) with Viewed/Not viewed. No marked date/expiry is shown for NONE; no viewed date is shown when viewing is unknown or expired.
 - Choose a mark and **Apply**, including Clear mark. This changes only the explicit decision; it does not manufacture a viewing event.
 - **Remove record** deletes all memory for the opportunity after confirmation.
@@ -100,15 +100,17 @@ Configured `seenDays` becomes `viewedDays`, and `skipDays` is preserved. The old
 
 SEEK IDs come from `/job/12345678`; query/tracking parameters are ignored. Complete normalized company + city + title also links reposts with different IDs. Trailing Ltd/Limited and title hyphens are normalized, while seniority is preserved: `Xero Limited / Auckland Central / Full-Stack Engineer` becomes `xero|auckland|full stack engineer`. Software Engineer and Senior Software Engineer remain distinct.
 
-Only explicitly recognized city names are collapsed. Unknown/missing location or company does not form a partial fallback key; use the SEEK ID instead. Identical complete canonical keys intentionally share memory, even if SEEK issued another ID. This heuristic cannot distinguish separate vacancies with identical company/city/title.
+Only explicitly recognized city names are collapsed. Unknown/missing location or company does not form a partial fallback key; use the SEEK ID instead. Within the same platform, identical complete canonical keys intentionally share memory, even if SEEK issued another ID. This heuristic cannot distinguish separate vacancies with identical company/city/title.
 
 The versioned, plain-data record schema is suitable for a later JSON/CSV exporter without storing job descriptions:
 
 ```text
-schemaVersion: 2
-canonicalKey: string
-seekIds: string[]
-url: canonical SEEK URL (no tracking parameters), or empty when no ID exists
+schemaVersion: 3
+platform: seek | linkedin
+canonicalKey: string (LinkedIn keys are prefixed with linkedin|)
+seekIds: string[] (SEEK records)
+linkedinIds: string[] (LinkedIn records)
+url: canonical job URL (no tracking parameters), or empty when no ID exists
 title, company, city: strings
 mark: NONE | SKIP | SAVED | APPLIED
 markChangedAt: Unix milliseconds or null
@@ -126,6 +128,7 @@ Viewed state is derived from a non-null `lastViewedAt`. `lastSeenAt` is observat
 | `src/background.js` | Serialized local storage writes and cleanup. |
 | `src/storage.js` | Content/options messaging client. |
 | `src/seek-extractor.js` | Centralized SEEK selectors and card/detail recognition. |
+| `src/linkedin-extractor.js` | Public/signed-in LinkedIn card and detail adapters, route validation. |
 | `src/content.js` | Navigation, dynamic cards, filtering, automatic views. |
 | `src/ui.js`, `src/styles.css` | Fixed floating rail, left-opening menus and feedback. |
 | `src/jd.js` | Shared Markdown generation, safe filenames and temporary Blob downloads. |
@@ -140,13 +143,13 @@ A debounced MutationObserver handles inserted/recycled cards and changed text/li
 ## Tests and Chrome checklist
 
 ```powershell
-node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs
+node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs tests/linkedin.test.cjs
 Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
 `tests/browser.html` exercises real content/extraction/UI code with mocked extension storage: fixed rail placement, absence of inline controls, left-opening menus, dismissal, positive visibility filters, mark/view independence, aliases, malformed cards, SPA navigation, and copied/downloaded Markdown equality. Clipboard and download handoff are intercepted in this fixture; it does not write your clipboard or save a JD file. `tests/options-browser.html` loads the real Memory UI with mocked extension APIs to test search, filters, edits, clear/remove, all four policies, and confirmation/cancellation. The options fixture requires Chrome's `--allow-file-access-from-files` flag for local fixture loading. These fixtures do not touch extension data.
 
-Verified: 23 Node tests, JavaScript syntax checks, and both headless Chrome fixtures. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
+Verified: 30 Node tests, JavaScript syntax checks, and three headless Chrome fixtures (SEEK, LinkedIn, Memory). The LinkedIn extractor also passed a local Chrome check against freshly retrieved public HTML: 60 result cards and one full detail with company/location/description. Live SEEK markup and real extension installation integration remain unverified in this environment; previous public SEEK requests returned a JavaScript/cookie challenge. Run these checks after reloading the unpacked extension:
 
 1. Open a search on `https://nz.seek.com` and confirm one rail appears at the right-middle with Copy JD/Export JD/Mark disabled until a job is open. Confirm no inline action bars remain. Confirm Skip is unselected and Applied/Saved/Viewed are selected by default. Open a new job: it gains Viewed and remains visible.
 2. Mark Saved, Applied, and Skip using the menu. Confirm the correct label/outline and default filtering. Open each marked job and check its mark and marked date are unchanged.
@@ -161,6 +164,22 @@ Verified: 23 Node tests, JavaScript syntax checks, and both headless Chrome fixt
 
 The blue magnifying-glass/check mark is an original, platform-neutral symbol for finding and selecting jobs. The editable vector is `icons/easyseek.svg`; Chrome uses the included 16, 32, 48 and 128 px PNG exports. The Memory tab also uses this icon. To rebuild the assets, run `python tools/generate_icons.py` with Pillow installed; this is optional development tooling and is not needed to load the extension.
 
-## Next platform
+## LinkedIn Jobs
 
-LinkedIn Jobs support is the next planned platform. It is not enabled yet: it needs its own DOM adapter and platform-qualified job IDs so LinkedIn IDs cannot collide with SEEK IDs. Existing SEEK browsing, marks and memory behavior are unchanged.
+Supported hosts are `www.linkedin.com`, `nz.linkedin.com`, and `linkedin.com`, over HTTPS. EasySeek runs job operations only under `/jobs` (including search, collections/recommendations with `currentJobId`, and full detail pages). Lightweight scripts load on these hosts to detect SPA navigation from the feed into Jobs, but do not inspect feed cards, send storage messages, or display the rail outside Jobs. No broad `*.linkedin.com` permission is requested.
+
+The same five-button rail provides Copy JD, Markdown download, marks, visibility filters and Memory. Filters and retention settings are shared across platforms. Mark/viewed records are isolated by platform: a LinkedIn job with ID 123 never matches SEEK ID 123, and similar company/title/location across platforms do not automatically merge. Within LinkedIn, complete canonical metadata still recognizes reposts. The existing conservative NZ city normalization is retained; unknown/overseas locations use listing IDs rather than guessing cities.
+
+LinkedIn URLs may be numeric (`/jobs/view/123/`), title slugs ending in an ID (`/jobs/view/engineer-at-company-123`), or split views (`/jobs/search/?currentJobId=123`). All normalize to `https://www.linkedin.com/jobs/view/123/`. Tracking parameters do not affect identity. Markdown labels the ID as LinkedIn rather than SEEK.
+
+Existing schema-2 memory migrates losslessly to schema 3 with `platform: seek`; existing SEEK keys, IDs, marks, viewed dates and retention anchors stay unchanged. Older V1 migrations still work. Memory displays each record's platform and linked IDs; editing/removing one platform's job does not affect the other.
+
+### LinkedIn DOM assumptions and limits
+
+Public cards use `.base-card` / `.base-search-card` and semantic `/jobs/view/` links. Signed-in cards use `.job-card-container` or result list items with `data-occludable-job-id`; the outer item is hidden so no empty wrapper remains. Public details use `.top-card-layout__title`, `.topcard__org-name-link`, and `.show-more-less-html__markup`; signed-in details use unified-top-card markers and `#job-details`/description content. All selectors are centralized in the LinkedIn adapter.
+
+A title and nonempty description must be visibly rendered in a shared detail container. Route IDs must agree with any job ID evidence on that container or title link. A stale detail during selection changes is withheld until it updates. Salary and posting age are optional; missing values say Not available. Only the rendered description is copied, so expand Show more yourself. No application buttons, native LinkedIn Save controls, messages, account settings or network APIs are operated by EasySeek. EasySeek marks are local and independent of LinkedIn's native Saved/Applied state.
+
+Public markup was checked using a [LinkedIn NZ job search](https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=New%20Zealand) and one linked detail, with scripts/external assets removed for the local extraction test. Signed-in behavior is covered by representative fixtures, **not verified in a logged-in account**; LinkedIn experiments may require selector maintenance. Feed-to-Jobs navigation, delayed descriptions, dynamic cards, mark/filter behavior and copy/download handoff are tested in `tests/linkedin-browser.html` without real account actions.
+
+After upgrading, reload the extension and LinkedIn tabs. Open Jobs, select a role, verify the rail enables and records Viewed, then test Skip/Saved/Applied, selecting visibility types to recover hidden jobs, Copy JD and download, and Memory. Switch jobs and use Back/Forward; briefly return to the feed (rail should disappear), then Jobs again. Confirm older SEEK memory remains available. No LinkedIn login is performed by the extension.

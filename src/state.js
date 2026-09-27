@@ -11,7 +11,29 @@
     }
     catch { return false; }
   }
-  function canonicalUrl(id) { return /^\d+$/.test(String(id || '')) ? `${canonicalOrigin}/job/${id}` : ''; }
+  const linkedinOrigins = Object.freeze(['https://www.linkedin.com', 'https://nz.linkedin.com', 'https://linkedin.com']);
+  function isLinkedInUrl(url) {
+    try { const parsed = new URL(url); return parsed.protocol === 'https:' && linkedinOrigins.includes(parsed.origin); }
+    catch { return false; }
+  }
+  function isLinkedInJobsUrl(url) {
+    try { return isLinkedInUrl(url) && /^\/jobs(?:\/|$)/.test(new URL(url).pathname); }
+    catch { return false; }
+  }
+  function isSupportedPage(url) { return isSeekUrl(url) || isLinkedInJobsUrl(url); }
+  function platformOf(job) { return job.platform === 'linkedin' || isLinkedInUrl(job.url) ? 'linkedin' : 'seek'; }
+  function linkedinJobId(url) {
+    try {
+      const parsed = new URL(url, linkedinOrigins[0]);
+      if (!isLinkedInJobsUrl(parsed.href)) return '';
+      const direct = parsed.pathname.match(/^\/jobs\/view\/(?:[^/]*-)?(\d+)(?:\/|$)/)?.[1];
+      return direct || (/^\d+$/.test(parsed.searchParams.get('currentJobId') || '') ? parsed.searchParams.get('currentJobId') : '');
+    } catch { return ''; }
+  }
+  function canonicalUrl(id, platform = 'seek') {
+    return /^\d+$/.test(String(id || '')) ? (platform === 'linkedin' ? `${linkedinOrigins[0]}/jobs/view/${id}/` : `${canonicalOrigin}/job/${id}`) : '';
+  }
+  function recordIds(record) { return platformOf(record) === 'linkedin' ? record.linkedinIds || [] : record.seekIds || []; }
   const normalize = value => String(value || '').normalize('NFKC').toLowerCase()
     .replace(/[\u2010-\u2015-]/g, ' ').replace(/\s+/g, ' ').trim();
   const company = value => normalize(value).replace(/,?\s+\b(limited|ltd)\.?$/, '').trim();
@@ -32,14 +54,16 @@
     } catch { return ''; }
   }
   function identity(job) {
-    const id = /^\d+$/.test(String(job.id || '')) ? String(job.id) : jobId(job.url);
+    const platform = platformOf(job);
+    const id = /^\d+$/.test(String(job.id || '')) ? String(job.id) : platform === 'linkedin' ? linkedinJobId(job.url) : jobId(job.url);
     const parts = [company(job.company), city(job.location), normalize(job.title)];
-    const canonicalKey = parts.every(Boolean) ? parts.join('|') : '';
-    return { id, canonicalKey, key: canonicalKey || (id ? 'seek:' + id : '') };
+    const canonicalKey = parts.every(Boolean) ? (platform === 'linkedin' ? 'linkedin|' : '') + parts.join('|') : '';
+    return { id, platform, canonicalKey, key: canonicalKey || (id ? platform + ':' + id : '') };
   }
   function matches(records, job) {
-    const { id, canonicalKey } = identity(job);
-    const byId = id ? records.filter(r => r.seekIds.includes(id)) : [];
+    const { id, platform, canonicalKey } = identity(job);
+    records = records.filter(record => platformOf(record) === platform);
+    const byId = id ? records.filter(r => recordIds(r).includes(id)) : [];
     // Known IDs win, but link complete canonical aliases to the same opportunity.
     const keys = new Set([canonicalKey, ...byId.map(r => r.canonicalKey)].filter(Boolean));
     return records.filter(r => byId.includes(r) || (r.canonicalKey && keys.has(r.canonicalKey)));
@@ -58,16 +82,17 @@
     for (const key of retentionKeys) if (validDays(saved[key])) result[key] = saved[key];
     return result;
   }
-  function recordKey(record) { return record.canonicalKey || 'seek:' + record.seekIds[0]; }
+  function recordKey(record) { return record.canonicalKey || platformOf(record) + ':' + recordIds(record)[0]; }
   const timestamp = value => Number.isFinite(value) && value >= 0;
   function migrate(records, now = Date.now()) {
     return records.map(record => {
-      if (record.schemaVersion === 2) return record;
+      if (record.schemaVersion === 3) return record;
+      if (record.schemaVersion === 2) return { ...record, schemaVersion: 3, platform: 'seek' };
       const assigned = [record.statusChangedAt,
         ...(['SKIP', 'PURSUE'].includes(record.status) && record.manualAt > 0 ? [record.manualAt] : []),
         record.updatedAt, record.lastSeenAt, record.firstSeenAt].find(timestamp) ?? now;
       const { status, statusChangedAt, manualAt, ...metadata } = record;
-      return { ...metadata, schemaVersion: 2,
+      return { ...metadata, schemaVersion: 3, platform: 'seek',
         url: canonicalUrl(record.seekIds[0]),
         mark: status === 'PURSUE' ? 'SAVED' : status === 'SKIP' ? 'SKIP' : 'NONE',
         markChangedAt: ['PURSUE', 'SKIP'].includes(status) ? assigned : null,
@@ -125,11 +150,11 @@
     const automatic = action === 'VIEW' || action === 'OBSERVE';
     const viewedTimes = found.map(record => record.lastViewedAt).filter(timestamp);
     const record = {
-      schemaVersion: 2, canonicalKey: old?.canonicalKey || ident.canonicalKey,
-      seekIds: [...new Set([...found.flatMap(record => record.seekIds), ident.id].filter(Boolean))],
+      schemaVersion: 3, platform: ident.platform, canonicalKey: old?.canonicalKey || ident.canonicalKey,
+      [ident.platform === 'linkedin' ? 'linkedinIds' : 'seekIds']: [...new Set([...found.flatMap(recordIds), ident.id].filter(Boolean))],
       title: job.title || old?.title || '', company: job.company || old?.company || '',
       city: city(job.location) || old?.city || '',
-      url: canonicalUrl(ident.id) || old?.url || '',
+      url: canonicalUrl(ident.id, ident.platform) || old?.url || '',
       mark: automatic ? old?.mark || 'NONE' : action,
       markChangedAt: automatic ? old?.markChangedAt ?? null : now,
       lastViewedAt: action === 'VIEW' ? now : viewedTimes.length ? Math.max(...viewedTimes) : null,
@@ -138,7 +163,7 @@
     };
     return record.mark !== 'NONE' || timestamp(record.lastViewedAt) ? [...rest, record] : rest;
   }
-  root.EasySeekState = { DAY, seekOrigins, canonicalOrigin, isSeekUrl, canonicalUrl, normalize, company, city, jobId, identity, matches, getState, hidden, cleanup, apply,
+  root.EasySeekState = { DAY, linkedinOrigins, isLinkedInUrl, isLinkedInJobsUrl, isSupportedPage, platformOf, linkedinJobId, recordIds, seekOrigins, canonicalOrigin, isSeekUrl, canonicalUrl, normalize, company, city, jobId, identity, matches, getState, hidden, cleanup, apply,
     marks, filterKeys, retentionKeys, defaults, preferences, validDays, recordKey, migrate, expiresAt, manage };
   if (typeof module !== 'undefined') module.exports = root.EasySeekState;
 })(globalThis);

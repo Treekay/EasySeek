@@ -4,7 +4,7 @@
   function markdown(job) {
     return '# ' + field(job.title) + '\n\n## Job details\n\n' +
       [['Title', job.title], ['Company', job.company], ['Location', job.location], ['Salary', job.salary],
-        ['Posted', job.posted], ['URL', job.url], ['SEEK Job ID', job.id]]
+        ['Posted', job.posted], ['URL', job.url], [job.platform === 'linkedin' ? 'LinkedIn Job ID' : 'SEEK Job ID', job.id]]
         .map(([label, value]) => `- **${label}:** ${field(value)}`).join('\n') +
       '\n\n## Job description\n\n' + String(job.description || '').trim() + '\n';
   }
