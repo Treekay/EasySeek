@@ -45,7 +45,7 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   const widths = [...menu('mark').children].map(node => node.getBoundingClientRect().width);
   assert(widths.every(width => width === widths[0]), 'equal mark buttons');
   button('mark-SAVED').click(); await pause();
-  assert(menu('mark').hidden && button('mark').textContent === 'Saved', 'mark selection collapses and reflects mark');
+  assert(menu('mark').hidden && button('mark').dataset.mark === 'SAVED' && button('mark').querySelector('svg'), 'mark selection collapses and reflects mark');
   assert(card.classList.contains('easyseek-saved'), 'saved card subtle highlight');
   const markedAt = records[0].markChangedAt;
   await navigate('?search=again'); await navigate('?jobId=12345678');

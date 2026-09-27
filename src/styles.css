@@ -1,13 +1,13 @@
 .easyseek-hidden { display: none !important; }
 .easyseek-saved { outline: 2px solid #25816c !important; outline-offset: -2px; }
 .easyseek-applied { outline: 2px solid #5266aa !important; outline-offset: -2px; }
-.easyseek-rail { all: initial; position: fixed; right: 12px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 2147483646; font: 12px/1.3 system-ui, sans-serif; color: #263447; }
+.easyseek-rail { all: initial; position: fixed; right: 12px; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 6px; z-index: 2147483646; font: 12px/1.3 system-ui, sans-serif; color: #263447; }
 .easyseek-rail *, .easyseek-feedback { box-sizing: border-box; }
 .easyseek-rail-row { position: relative; display: flex; justify-content: flex-end; }
-.easyseek-rail button { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; font: 600 12px/1.25 system-ui, sans-serif; color: #344054; background: #fff; border: 1px solid #d8e0e8; border-radius: 9px; padding: 6px; cursor: pointer; box-shadow: 0 2px 8px #172b4d1a; transition: background .12s, border-color .12s; }
-.easyseek-rail .easyseek-main { width: 56px; height: 48px; }
+.easyseek-rail button { all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center; text-align: center; font: 600 12px/1.25 system-ui, sans-serif; color: #344054; background: #fff; border: 1px solid #d8e0e8; border-radius: 7px; padding: 6px; cursor: pointer; box-shadow: 0 2px 6px #172b4d14; transition: background .12s, border-color .12s; }
+.easyseek-rail .easyseek-main { width: 40px; height: 40px; }
 .easyseek-rail .easyseek-copy { background: #2166cc; border-color: #2166cc; color: white; }
-.easyseek-rail .easyseek-export { background: #168369; border-color: #168369; color: white; font-size: 15px; }
+.easyseek-rail .easyseek-export { background: #168369; border-color: #168369; color: white; font-size: 12px; }
 .easyseek-rail button:hover { filter: brightness(.96); }
 .easyseek-rail button:focus-visible { outline: 3px solid #5598f2; outline-offset: 2px; }
 .easyseek-rail button:disabled { opacity: .42; cursor: default; filter: none; }
@@ -17,14 +17,16 @@
 .easyseek-rail button[data-mark="SKIP"] { color: #96452e; }
 .easyseek-submenu { position: absolute; right: calc(100% + 8px); top: 0; display: flex; gap: 6px; width: max-content; max-width: calc(100vw - 92px); }
 .easyseek-submenu[hidden] { display: none !important; }
-.easyseek-submenu > button { width: 64px; height: 48px; }
+.easyseek-submenu > button { width: 44px; height: 44px; font-size: 10px; padding: 3px; }
 #easyseek-filter-menu { display: flex; flex-direction: column; }
 .easyseek-filter-toggles { display: flex; gap: 6px; }
-.easyseek-filter-toggles button { width: 66px; height: 48px; flex: 1 1 0; min-width: 0; }
+.easyseek-filter-toggles button { width: 44px; height: 44px; flex: 0 0 44px; font-size: 10px; padding: 3px; }
 .easyseek-filter-tools { display: flex; justify-content: flex-end; gap: 6px; }
-.easyseek-filter-tools button { min-height: 28px; padding: 4px 8px; font-size: 11px; }
+.easyseek-filter-tools button { width: 44px; height: 44px; padding: 3px; font-size: 10px; }
 .easyseek-rail button[aria-pressed="true"] { background: #eaf2ff; border-color: #4981cf; color: #174c94; }
 .easyseek-feedback { position: fixed; bottom: 20px; right: 20px; max-width: min(420px, 90vw); padding: 10px 14px; font: 13px/1.5 system-ui, sans-serif; color: #fff; background: #23364b; border-radius: 8px; z-index: 2147483647; box-shadow: 0 4px 20px #0003; }
 .easyseek-feedback[hidden] { display: none; }
-@media (max-width: 420px) { .easyseek-rail { right: 6px; } .easyseek-submenu { max-width: calc(100vw - 80px); gap: 4px; } .easyseek-filter-toggles { gap: 4px; width: min(284px, calc(100vw - 80px)); } .easyseek-filter-toggles button { font-size: 11px; padding: 4px; } }
+@media (max-width: 420px) { .easyseek-rail { right: 6px; } .easyseek-submenu { max-width: calc(100vw - 80px); gap: 4px; } .easyseek-filter-toggles { gap: 4px; } }
 @media (max-height: 360px) { .easyseek-rail { gap: 4px; } .easyseek-rail .easyseek-main { height: 40px; } }
+
+.easyseek-main svg { width: 19px; height: 19px; display: block; flex: none; }

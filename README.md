@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.3.0** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
+Version **1.3.1** replaces inline controls with a floating rail and adds on-demand JD copy/download. Chrome may request approval for clipboard-write permission when updating. Reload the extension and your SEEK tabs after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -27,11 +27,11 @@ These are independent concepts:
 
 ## Floating action rail
 
-The right-middle edge of the viewport has four compact, fixed buttons. There are no injected action bars inside cards or detail panels.
+The right-middle edge of the viewport has four compact, fixed 40 × 40 px square buttons. Copy uses a clipboard icon, Mark a pencil, and Filter a funnel; accessible names and hover tooltips identify each action. Submenu buttons are also square. There are no injected action bars inside cards or detail panels.
 
 - **Copy JD** (blue) copies the active job as structured Markdown and shows “Copied” after success.
 - **.md** (green) downloads the same Markdown as `company-title-seekJobId.md`.
-- **Mark** opens three equal-sized buttons to its left: **Skip / Saved / Applied**. Selecting one closes the menu. The main button reflects the current mark; its tooltip also shows whether the job was viewed. Saved and Applied cards retain subtle outlines.
+- **Mark** opens three equal-sized buttons to its left: **Skip / Saved / Applied**. Selecting one closes the menu. The pencil icon color and tooltip reflect the current mark; its tooltip also shows whether the job was viewed. Saved and Applied cards retain subtle outlines.
 - **Filter** opens four independent toggle buttons to its left. Selected toggles have a blue active state. This menu stays open for repeated changes; Escape, clicking outside, or clicking Filter again closes it. Small **Show Hidden** and **Memory** buttons sit beneath the toggles. The Filter tooltip reports loaded cards shown/hidden.
 
 The rail acts on a full detail page or the active split-view detail pane. Without a parseable detail, Copy JD, .md and Mark are disabled; Filter remains available. Each job action reparses the active detail when clicked, and stale content during SPA transitions is withheld. Menus support native button keyboard navigation, visible focus, and Escape to close. On narrow viewports filter buttons shrink to keep the submenu on screen.
