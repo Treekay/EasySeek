@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "EasySeek — SEEK NZ browsing memory",
+  "version": "1.0.0",
+  "description": "Remember reviewed jobs, hide repeats, and copy a job for Career Ops. Local only.",
+  "permissions": ["storage", "clipboardWrite"],
+  "background": { "service_worker": "src/background.js" },
+  "content_scripts": [{
+    "matches": ["https://www.seek.co.nz/*", "https://seek.co.nz/*"],
+    "js": ["src/state.js", "src/seek-extractor.js", "src/storage.js", "src/ui.js", "src/content.js"],
+    "css": ["src/styles.css"],
+    "run_at": "document_idle"
+  }]
+}

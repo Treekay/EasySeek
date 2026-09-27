@@ -1,0 +1,16 @@
+.easyseek-hidden { display: none !important; }
+.easyseek-pursue { outline: 2px solid #25816c !important; outline-offset: -2px; }
+[data-easyseek-ui] { box-sizing: border-box; font: 13px/1.5 system-ui, sans-serif; color: #263447; }
+.easyseek-actions, .easyseek-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 12px; border: 1px solid #dce3e8; border-radius: 8px; background: #f7f9fb; }
+.easyseek-actions { margin-top: 10px; position: relative; z-index: 2; }
+.easyseek-controls { margin: 10px 0; }
+.easyseek-controls label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.easyseek-controls input { appearance: auto; width: 15px; height: 15px; margin: 0; accent-color: #245e83; }
+.easyseek-actions button { appearance: none; font: inherit; color: #244d70; background: #fff; border: 1px solid #bdcad5; border-radius: 5px; padding: 3px 8px; cursor: pointer; }
+.easyseek-actions button:hover { background: #eaf1f7; }
+.easyseek-actions button:focus-visible, .easyseek-controls input:focus-visible { outline: 2px solid #245e83; outline-offset: 2px; }
+.easyseek-badge { font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+[data-state="PURSUE"] .easyseek-badge { color: #17634f; }
+[data-state="SKIP"] .easyseek-badge { color: #873c30; }
+.easyseek-feedback { position: fixed; bottom: 20px; right: 20px; max-width: min(420px, 90vw); padding: 12px 16px; color: #fff; background: #23364b; border-radius: 8px; z-index: 2147483647; box-shadow: 0 4px 20px #0003; }
+.easyseek-feedback[hidden] { display: none; }
