@@ -248,11 +248,13 @@ URL paths, query strings, IP aliases, and redirect destinations are not allowed.
 Chrome host permissions cover ports; EasySeek additionally pins each request to
 the configured origin and fixed API paths.
 
-The existing career-workspace defaults to port **3001**. Either set EasySeek's URL
-to `http://localhost:3001`, or set `API_PORT=8765` in career-workspace's `.env` and
-restart it. Keep the workspace bound to loopback. Add the exact extension origin
-shown beneath the settings to workspace `.env` as `IMPORT_EXTENSION_ORIGINS`, then
-restart. No authentication or cloud service is introduced.
+Copy the active endpoint from career-workspace **Settings / Setup → EasySeek**
+(normally `http://localhost:3001`) into this extension's URL field. To change the
+server port, edit the workspace endpoint in Settings, save and restart both servers.
+Add the exact extension origin shown beneath these settings to workspace **Settings →
+Allowed extension origins**, then save and restart. Routine workspace `.env` editing
+is deprecated; its old variables remain compatibility fallbacks. Keep the workspace
+bound to loopback. No authentication or cloud service is introduced.
 
 **Test connection** calls `GET /api/health` and verifies the Career Workspace
 service response; it never imports a job or enables the integration. It tests

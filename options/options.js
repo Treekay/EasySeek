@@ -118,7 +118,7 @@
     if (changes.preferences) preferences = S.preferences(changes.preferences.newValue);
     render();
   });
-  $('career-origin').textContent = 'Allow this origin in Career Workspace IMPORT_EXTENSION_ORIGINS: chrome-extension://' + (chrome.runtime.id || 'YOUR_EXTENSION_ID');
+  $('career-origin').textContent = 'Copy into Career Workspace Settings → Allowed extension origins: chrome-extension://' + (chrome.runtime.id || 'YOUR_EXTENSION_ID');
   const trackerFeedback = text => { $('career-feedback').textContent = text; };
   async function configureTracker(testOnly) {
     const enabled = $('career-enabled').checked;
