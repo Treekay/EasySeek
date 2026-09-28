@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>EasySeek Memory</title><link rel="icon" type="image/png" href="../icons/icon-32.png"><link rel="stylesheet" href="options.css">
-  <script defer src="../src/state.js"></script><script defer src="../src/storage.js"></script><script defer src="../src/applications.js"></script><script defer src="options.js"></script>
+  <script defer src="../src/state.js"></script><script defer src="../src/tracker.js"></script><script defer src="../src/storage.js"></script><script defer src="../src/applications.js"></script><script defer src="options.js"></script>
 </head>
 <body><main>
   <header><h1>EasySeek Memory</h1><p>Your browsing memory and application progress, stored only in this Chrome profile.</p></header>
@@ -29,6 +29,17 @@
       <p class="hint">Select the types of jobs to show. Unselected types are hidden; a viewed job with a mark needs both selected. Applications includes Applied, Interview, Offered and Rejected. Select all four to show everything.</p>
       <button type="submit">Save settings</button>
     </form>
+  </section>
+  <section aria-labelledby="career-heading">
+    <h2 id="career-heading">Career Workspace</h2>
+    <p class="hint">Optional local handoff when you mark a job Saved or Applied. EasySeek keeps working when the tracker is offline.</p>
+    <form id="career-settings">
+      <label><input id="career-enabled" type="checkbox"> Enabled</label>
+      <label>URL<input id="career-url" type="url" value="http://localhost:8765" required></label>
+      <div class="actions"><button type="submit">Save Career Workspace</button><button id="career-test" type="button">Test connection</button></div>
+    </form>
+    <p id="career-origin" class="hint"></p>
+    <p id="career-feedback" class="hint" role="status" aria-live="polite"></p>
   </section>
   <section aria-labelledby="maintenance-heading">
     <h2 id="maintenance-heading">Maintenance</h2>

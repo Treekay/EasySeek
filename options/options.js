@@ -2,6 +2,7 @@
   'use strict';
   const S = EasySeekState, A = EasySeekApplications, store = EasySeekStorage;
   const $ = id => document.getElementById(id);
+  let trackerDirty = false;
   let records = [], preferences = S.preferences(), busy = false, dirty = false;
   const date = value => Number.isFinite(value) ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
   function node(tag, text) { const element = document.createElement(tag); element.textContent = text; return element; }
@@ -85,6 +86,8 @@
       records = result.records; preferences = result.preferences;
       if (type === 'preferences') dirty = false;
       render(); feedback(message);
+      if (!trackerDirty && result.tracker) { $('career-enabled').checked = result.tracker.enabled; $('career-url').value = result.tracker.url; }
+      store.handoff(result, warning => feedback('Career Workspace: ' + warning));
     } catch (error) { feedback(error.message, true); }
     finally { busy = false; document.querySelectorAll('button').forEach(button => { button.disabled = false; }); }
   }
@@ -115,5 +118,26 @@
     if (changes.preferences) preferences = S.preferences(changes.preferences.newValue);
     render();
   });
+  $('career-origin').textContent = 'Allow this origin in Career Workspace IMPORT_EXTENSION_ORIGINS: chrome-extension://' + (chrome.runtime.id || 'YOUR_EXTENSION_ID');
+  const trackerFeedback = text => { $('career-feedback').textContent = text; };
+  async function configureTracker(testOnly) {
+    const enabled = $('career-enabled').checked;
+    try {
+      const url = EasySeekTracker.endpoint($('career-url').value);
+      // Call permissions.request directly within the user gesture, before messaging.
+      if ((enabled || testOnly) && !await chrome.permissions.request({ origins: [EasySeekTracker.permission(url)] })) throw new Error('Localhost permission not granted. EasySeek marking is unchanged.');
+      if (testOnly) {
+        await store.request('trackerTest', { url });
+        trackerFeedback('Connected to Career Workspace. No job was imported.');
+      } else {
+        await store.request('trackerSettings', { settings: { enabled, url } });
+        trackerDirty = false;
+        trackerFeedback(enabled ? 'Local handoff enabled for future Saved / Applied actions.' : 'Local handoff disabled.');
+      }
+    } catch (error) { trackerFeedback(error.message); }
+  }
+  $('career-settings').addEventListener('input', () => { trackerDirty = true; });
+  $('career-settings').addEventListener('submit', event => { event.preventDefault(); configureTracker(false); });
+  $('career-test').addEventListener('click', () => configureTracker(true));
   run('read');
 })();

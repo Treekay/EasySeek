@@ -3,12 +3,15 @@
 <script src="../src/state.js"></script>
 <script>
 const S = EasySeekState;
-let records = [], preferences = S.preferences();
+let records = [], preferences = S.preferences(), tracker = { enabled: false, url: 'http://localhost:8765' };
+let trackerOnline = true, permissionGranted = true, permissionRequests = [];
 var confirmations = [], allowConfirm = false;
 for (const [index, status] of ['VIEW', 'SKIP', 'SAVED'].entries()) {
   records = S.apply(records, { id: String(index + 1), title: ['Engineer', 'Designer', '<img src=x onerror=alert(1)>'][index], company: 'Example Ltd', location: 'Auckland' }, status, Date.now() - (index + 1) * S.DAY);
 }
 globalThis.mockChrome = { runtime: { async sendMessage(message) {
+  if (message.type === 'trackerSettings') { tracker = message.settings; return { ok: true, tracker }; }
+  if (message.type === 'trackerTest') return trackerOnline ? { ok: true, connection: { status: 'ok' } } : { ok: false, error: 'Local tracker unavailable. Your mark is saved.' };
   if (message.type === 'manage') records = S.manage(records, message.key, message.action);
   if (message.type === 'preferences') preferences = S.preferences({ ...preferences, ...message.preferences });
   if (message.type === 'bulk') {
@@ -16,8 +19,8 @@ globalThis.mockChrome = { runtime: { async sendMessage(message) {
     if (message.action !== 'EXPIRED') throw new Error('Invalid cleanup action');
   }
   records = S.cleanup(records, Date.now(), preferences);
-  return { ok: true, records, preferences };
-} }, storage: { onChanged: { addListener() {} } } };
+  return { ok: true, records, preferences, tracker };
+} }, permissions: { async request(value) { permissionRequests.push(value); return permissionGranted; } }, storage: { onChanged: { addListener() {} } } };
 const pause = () => new Promise(resolve => setTimeout(resolve, 150));
 const assert = (value, message) => { if (!value) throw new Error(message); };
 (async () => {
@@ -85,6 +88,22 @@ const assert = (value, message) => { if (!value) throw new Error(message); };
   doc.querySelector('.record .stage-select').value = 'NONE'; doc.querySelector('.record .stage-save').click(); await pause();
   $('filter').value = ''; $('filter').dispatchEvent(new win.Event('change'));
   assert(records.find(record => record.platform === 'linkedin').applicationHistory.at(-1).stage === 'NONE', 'reset stage keeps historical events');
-  document.querySelector('#report').textContent = 'PASS: options rendering, sorting, search, filter, safe text, independent viewed filter, expiry, marks, clear mark, remove confirmation, three retention settings, never-expiring application history, application filters and CSV export, cleanup confirmation';
+  assert(!$('career-enabled').checked && $('career-url').value === 'http://localhost:8765', 'tracker defaults disabled on port 8765');
+  $('career-enabled').checked = true; $('career-url').value = 'http://localhost:3001';
+  $('career-settings').dispatchEvent(new win.Event('submit', { cancelable: true })); await pause();
+  assert(tracker.enabled && tracker.url === 'http://localhost:3001', 'tracker settings persisted');
+  assert(permissionRequests[0].origins[0] === 'http://localhost/*', 'only local permission requested');
+  const beforeTest = JSON.stringify(records);
+  $('career-test').click(); await pause();
+  assert($('career-feedback').textContent.includes('Connected'), 'connection test success');
+  assert(JSON.stringify(records) === beforeTest, 'connection test imports nothing');
+  trackerOnline = false; $('career-test').click(); await pause();
+  assert($('career-feedback').textContent.includes('unavailable'), 'offline warning');
+  $('career-url').value = 'https://example.com'; $('career-test').click(); await pause();
+  assert($('career-feedback').textContent.includes('localhost'), 'remote endpoint rejected');
+  $('career-enabled').checked = false; $('career-url').value = 'http://localhost:8765';
+  $('career-settings').dispatchEvent(new win.Event('submit', { cancelable: true })); await pause();
+  assert(!tracker.enabled, 'tracker can be disabled');
+  document.querySelector('#report').textContent = 'PASS: Career Workspace settings, localhost permission, connection test and offline warning;  options rendering, sorting, search, filter, safe text, independent viewed filter, expiry, marks, clear mark, remove confirmation, three retention settings, never-expiring application history, application filters and CSV export, cleanup confirmation';
 })().catch(error => document.querySelector('#report').textContent = 'FAIL: ' + error.stack);
 </script></html>

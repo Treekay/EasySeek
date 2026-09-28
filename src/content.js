@@ -17,10 +17,11 @@
   }
   async function act(job, action) {
     try {
-      const data = await store.request('action', { job: memoryJob(job), action });
+      const data = await store.request('action', { job: memoryJob(job), action, ...(['SAVED', 'APPLIED'].includes(action) && job.description ? { jdMarkdown: job.description } : {}) });
       records = data.records;
       schedule();
       UI.notify(action === 'NONE' ? 'Mark cleared' : S.stages.includes(action) ? 'Progress: ' + action : 'Marked ' + action);
+      store.handoff(data, warning => UI.notify('Career Workspace: ' + warning));
     } catch (error) { fail(error); }
   }
   function schedule() { clearTimeout(timer); timer = setTimeout(scan, 120); }

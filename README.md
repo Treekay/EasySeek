@@ -2,7 +2,7 @@
 
 A lightweight Manifest V3 Chrome extension for SEEK New Zealand and LinkedIn Jobs browsing. It remembers which jobs you viewed and lets you mark opportunities **Saved** or **Skip**, and track **Applied / Interview / Offered / Rejected**, while keeping each site's own search and detail UI.
 
-Plain JavaScript and CSS, no build step or dependencies. All data stays in `chrome.storage.local` in this Chrome profile. No backend, accounts, cloud sync, analytics, network requests, crawling, application automation, or messages. Full job descriptions are never stored in extension memory. Copy JD and .md download are generated only on request from the current page. Memory offers an explicit local applications CSV download. There is no Career Ops integration, JSON export, sync, automated analysis, or Sankey diagram.
+Plain JavaScript and CSS, no build step or dependencies. Browsing memory stays in `chrome.storage.local` in this Chrome profile. No backend is required. An optional, disabled-by-default Career Workspace handoff sends explicitly Saved/Applied jobs to a configured localhost tracker. There are no accounts, cloud sync, analytics, crawling, application automation, or outreach messages. Full job descriptions are never stored in extension memory. Copy JD and .md download are generated only on request from the current page. Memory offers an explicit local applications CSV download. There is no Career Ops integration, JSON export, sync, automated analysis, or Sankey diagram.
 
 ## Install or update
 
@@ -12,7 +12,7 @@ Plain JavaScript and CSS, no build step or dependencies. All data stays in `chro
 
 Supported hosts: production SEEK New Zealand at `https://nz.seek.com`, plus the legacy `https://seek.co.nz` and `https://www.seek.co.nz` domains. The extension recognizes search cards, `/job/{numeric ID}` details, and split views with a numeric `jobId` query parameter. Other countries/subdomains are not enabled. Content scripts match all paths on these three hosts for client-side navigation, with a single floating rail; job-specific actions are enabled only for a recognized active detail.
 
-Version **1.6.0** separates browsing marks from application progress, keeps stage event history, and adds an Applications view and local CSV export in Memory. Stored records migrate to schema 4; JD Markdown uses handoff schema 2. Reload the extension, job tabs and Memory after updating.
+Version **1.7.0** adds optional local Career Workspace handoff. Version 1.6.0 separates browsing marks from application progress, keeps stage event history, and adds an Applications view and local CSV export in Memory. Stored records migrate to schema 4; JD Markdown uses handoff schema 2. Reload the extension, job tabs and Memory after updating.
 
 Runtime host validation and canonical URL generation live in `src/state.js` (`seekOrigins`, `isSeekUrl`, `canonicalUrl`). The background worker and extractor reuse these helpers. Manifest match patterns must remain declarative; a test checks that they match the shared origin list. Only the listed HTTPS origins are accepted, not unrelated hosts or lookalike subdomains.
 
@@ -196,7 +196,7 @@ A debounced MutationObserver handles inserted/recycled cards and changed text/li
 ## Tests and Chrome checklist
 
 ```powershell
-node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs tests/linkedin.test.cjs tests/applications.test.cjs
+node --test tests/state.test.cjs tests/management.test.cjs tests/jd.test.cjs tests/linkedin.test.cjs tests/applications.test.cjs tests/tracker.test.cjs
 Get-ChildItem src\*.js, options\*.js | ForEach-Object { node --check $_.FullName }
 ```
 
@@ -236,3 +236,54 @@ A title and nonempty description must be visibly rendered in a shared detail con
 Public markup was checked using a [LinkedIn NZ job search](https://www.linkedin.com/jobs/search/?keywords=software%20engineer&location=New%20Zealand) and one linked detail, with scripts/external assets removed for the local extraction test. The supplied saved SDUI page was also verified offline in Chrome with its original local CSS: 25 cards and the selected detail including the final description requirements. The original page is not included in this repository; `tests/linkedin-sdui-browser.html` uses a reduced structure with synthetic content and tests enabled actions, full JD copy/export, filtering and partial SPA updates. Live signed-in extension integration remains unverified; LinkedIn experiments may require selector maintenance. Feed-to-Jobs navigation, delayed descriptions, dynamic cards, mark/filter behavior and copy/download handoff are tested in `tests/linkedin-browser.html` without real account actions.
 
 After upgrading, reload the extension and LinkedIn tabs. Open Jobs, select a role, verify the rail enables and records Viewed, then test Skip/Saved/Applied, selecting visibility types to recover hidden jobs, Copy JD and download, and Memory. Switch jobs and use Back/Forward; briefly return to the feed (rail should disappear), then Jobs again. Confirm older SEEK memory remains available. No LinkedIn login is performed by the extension.
+
+
+## Optional Career Workspace handoff
+
+Open **Memory → Career Workspace**. The integration starts **disabled**, with URL
+`http://localhost:8765`. Set the URL, select **Enabled**, and click **Save Career
+Workspace**. Chrome requests permission only for the selected local host. You can
+use `http://127.0.0.1:<port>` instead. Remote addresses, non-HTTP URLs, credentials,
+URL paths, query strings, IP aliases, and redirect destinations are not allowed.
+Chrome host permissions cover ports; EasySeek additionally pins each request to
+the configured origin and fixed API paths.
+
+The existing career-workspace defaults to port **3001**. Either set EasySeek's URL
+to `http://localhost:3001`, or set `API_PORT=8765` in career-workspace's `.env` and
+restart it. Keep the workspace bound to loopback. Add the exact extension origin
+shown beneath the settings to workspace `.env` as `IMPORT_EXTENSION_ORIGINS`, then
+restart. No authentication or cloud service is introduced.
+
+**Test connection** calls `GET /api/health` and verifies the Career Workspace
+service response; it never imports a job or enables the integration. It tests
+reachability, not write authorization. A later 403 warning means the workspace's
+extension-origin configuration needs attention. Testing while disabled can still
+request local host permission, but automatic handoff remains disabled.
+
+After saving a **Saved** or **Applied** action, EasySeek sends
+`POST /api/applications/import` from its background worker, containing `source`,
+`sourceJobId`, `canonicalKey`, `title`, `company`, `location`, `url`, `mark` (the
+current independent browsing mark), `requestedStage`, and `jdMarkdown` when
+available. Page actions include the complete currently extracted description,
+including the final paragraph. No extra navigation, scraping, or expansion occurs.
+Memory-page actions send metadata only because no live JD is available there.
+Descriptions are never saved in extension storage.
+
+Marking and retention run independently of networking. A refused, offline, or
+slow tracker shows a small local warning; marks and progress remain saved. Requests
+time out after four seconds. There is no background retry loop, queue replay, or
+bulk import of existing memory. When the tracker returns, explicitly select Saved
+or Applied again to retry. Simultaneous identical requests are coalesced; subsequent
+retries use stable source IDs and the workspace's idempotent import API. Tracker
+identity conflicts remain for explicit resolution in Career Workspace.
+
+Other stages, Viewed, Skip, clearing/removing memory, and expiry send nothing to
+the tracker. Disabling the option stops future handoffs. Existing local host
+permission may remain granted; remove it through Chrome extension permissions if
+desired. Clearing EasySeek memory never deletes workspace applications.
+
+Verification for this change: 50 Node tests, JavaScript syntax checks, and four
+browser fixtures (including connection settings and offline recovery). Reload the
+extension and job tabs after updating. The first optional permission prompt must
+be accepted in your own Chrome profile; automated fixtures use mocked extension
+permissions and do not modify your installed extension or personal data.

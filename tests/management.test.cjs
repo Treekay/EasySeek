@@ -7,7 +7,7 @@ const job = { id: '1', title: 'Engineer', company: 'Example Ltd', location: 'Auc
 function worker(initial = {}) {
   let listener, opened = 0;
   const saved = structuredClone(initial);
-  const context = vm.createContext({ EasySeekState: S, importScripts() {}, chrome: {
+  const context = vm.createContext({ EasySeekState: S, EasySeekTracker: require('../src/tracker.js'), importScripts() {}, chrome: {
     runtime: { id: 'test', getURL(path) { return 'chrome-extension://test/' + path; }, onMessage: { addListener(fn) { listener = fn; } } },
     tabs: { async create({ url }) { assert.equal(url, 'chrome-extension://test/options/options.html'); opened++; } },
     storage: { local: { async get() { return structuredClone(saved); }, async set(data) { Object.assign(saved, structuredClone(data)); } } }
