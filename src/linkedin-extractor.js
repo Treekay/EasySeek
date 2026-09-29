@@ -26,7 +26,22 @@
     }
     return '';
   }
-  function detailCompany(scope, heading, description) {
+  function detailCompany(scope, heading, description, root, id) {
+    // SDUI can render company metadata outside the title/body common ancestor.
+    // Its auto-binding key explicitly associates the company component with a job.
+    const bound = [...root.querySelectorAll('[componentkey][aria-label]')].filter(node =>
+      /^auto-binding-.+-[0-9]+$/.test(node.getAttribute('componentkey') || '') &&
+      node.getAttribute('componentkey').endsWith('-' + id) &&
+      /^Company,\s*/.test(node.getAttribute('aria-label') || '') &&
+      visible(node) && !node.closest(selectors.card) &&
+      !node.closest(selectors.description + ', [id^="JobDetails_AboutTheJob_"]'));
+    if (bound.length) {
+      const names = [...new Set(bound.flatMap(node =>
+        [...node.querySelectorAll('a[href*="/company/"]')]
+          .filter(link => visible(link) && S.isLinkedInUrl(link.href) && /^\/company\/[^/]+(?:\/|$)/.test(new URL(link.href).pathname))
+          .map(text).filter(Boolean)))];
+      return names.length === 1 ? names[0] : '';
+    }
     // Search the title's own header first. Standalone pages may use a plain
     // company link without the legacy top-card company CSS classes.
     const selector = selectors.detailCompany + ', a[href*="/company/"]';
@@ -84,7 +99,7 @@
       // The body component and title link must independently identify the same job.
       if (!links.length || links.some(link => S.linkedinJobId(link.href) !== id)) continue;
       const heading = links[0];
-      const company = detailCompany(scope, heading, body);
+      const company = detailCompany(scope, heading, body, root, id);
       const metadata = [...scope.querySelectorAll('p')].find(node =>
         (heading.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
         (node.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING) && text(node).includes('·') && /\b(?:ago|applicants|clicked apply)\b/i.test(text(node)));
@@ -136,7 +151,7 @@
       const salaryText = read(scope, selectors.salary);
       const salary = /[$€£¥]|\b(?:NZD|USD|AUD|salary)\b/i.test(salaryText) ? salaryText : '';
       return { node: scope, heading, descriptionNode: description, job: {
-        platform: 'linkedin', id, title: text(heading), company: detailCompany(scope, heading, description),
+        platform: 'linkedin', id, title: text(heading), company: detailCompany(scope, heading, description, root, id),
         location: read(scope, selectors.detailLocation), salary, posted,
         url: S.canonicalUrl(id, 'linkedin'), description: text(description)
       } };

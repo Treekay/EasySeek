@@ -305,3 +305,10 @@ is preferred; hidden labels and conflicting names are rejected.
 `tests/linkedin-standalone-browser.html` is a synthetic regression based on the reported
 standalone layout, covering Saved/Applied payloads and unrelated-company exclusion;
 it is not a capture or verification of the user's authenticated DOM.
+
+LinkedIn SDUI company components carrying `aria-label="Company, …"` and an
+`auto-binding-…-<jobId>` component key are now associated by the exact current job ID.
+This supports company metadata outside the title/JD common ancestor without relying
+on generated CSS classes. The standalone browser regression includes the reported
+Microsoft component attributes and rejects wrong IDs, hidden/conflicting components,
+and components embedded in the JD. No company name is hardcoded into extraction.

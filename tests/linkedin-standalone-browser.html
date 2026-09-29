@@ -26,6 +26,23 @@ try {
  assert(read().job.company==='','ambiguous header rejected');extra.remove();
  company.remove();
  assert(read().job.company==='', 'missing header company must not use outreach, recommendations or JD companies');
- document.querySelector('#report').textContent='PASS: standalone header company, Saved/Applied payloads, hidden/ambiguous metadata and unrelated companies';
+ // Real reported company component attributes; unrelated logo assets omitted.
+ const bound=document.createElement('div');
+ bound.className='m6fip7 m6fa1x m6fipj m6fjp7 m6fidz m6fisf m6fit7 m6fmwa';
+ bound.setAttribute('componentkey','auto-binding-921dd62c-f82f-4ff9-9e2b-686b60e9f886-4341035834');
+ bound.setAttribute('aria-label','Company, Microsoft.');
+ bound.innerHTML='<p><a class="m6ffq2 m6ffq9 m6ffrg m6fmt7" href="https://www.linkedin.com/company/microsoft/life/">Microsoft</a></p>';
+ document.querySelector('main').prepend(bound);
+ assert(read().job.company==='Microsoft','job-bound company outside title/body scope');
+ assert(EasySeekTracker.payload(read().job,{mark:'SAVED'},'SAVED').company==='Microsoft','reported component produces import payload');
+ bound.setAttribute('componentkey','auto-binding-921dd62c-f82f-4ff9-9e2b-686b60e9f886-14341035834');
+ assert(read().job.company==='','numeric suffix must match entire job ID');
+ bound.setAttribute('componentkey','auto-binding-921dd62c-f82f-4ff9-9e2b-686b60e9f886-4341035834');
+ bound.hidden=true; assert(read().job.company==='','hidden stale bound metadata excluded'); bound.hidden=false;
+ const conflict=bound.cloneNode(true);conflict.querySelector('a').textContent='Other company';document.querySelector('main').prepend(conflict);
+ assert(read().job.company==='','conflicting same-ID metadata rejected');conflict.remove();
+ document.querySelector('#job-details').append(bound);
+ assert(read().job.company==='','company component embedded inside JD excluded');
+ document.querySelector('#report').textContent='PASS: standalone and real job-bound company component, import payload, exact ID, hidden/conflicting metadata and JD exclusion';
 } catch(e) {document.querySelector('#report').textContent='FAIL: '+e.stack;}
 </script></html>
