@@ -113,6 +113,12 @@ const assert = (condition, message) => { if (!condition) throw new Error(message
   assert(records.find(record => record.seekIds.includes('88888888')).applicationHistory.length === 4, 'same stage does not duplicate');
   button('export').click(); await pause();
   assert((await exported.text()).includes('application_stage: "rejected"') && (await exported.text()).includes('"stage":"INTERVIEW"'), 'JD handoff contains stage history');
+  button('mark').click(); button('mark-STAGE_NONE').click(); await pause();
+  const cleared = records.find(record => record.seekIds.includes('88888888'));
+  assert(cleared.applicationStage === 'NONE' && cleared.applicationHistory.length === 5 && cleared.applicationHistory.at(-1).stage === 'NONE', 'clear progress preserves history');
+  button('mark').click(); button('mark-SAVED').click(); await pause();
+  button('mark').click(); button('mark-NONE').click(); await pause();
+  assert(records.find(record => record.seekIds.includes('88888888')).mark === 'NONE', 'clear saved mark from rail');
   EasySeekExtractor.detail = extract;
   await navigate('?no-detail'); for (const action of ['copy', 'export', 'mark']) assert(button(action).disabled, 'leaving detail disables ' + action);
   assert(document.querySelectorAll('.easyseek-rail').length === 1, 'single rail across SPA changes');

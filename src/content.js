@@ -20,7 +20,7 @@
       const data = await store.request('action', { job: memoryJob(job), action, ...(['SAVED', 'APPLIED'].includes(action) && job.description ? { jdMarkdown: job.description } : {}) });
       records = data.records;
       schedule();
-      UI.notify(action === 'NONE' ? 'Mark cleared' : S.stages.includes(action) ? 'Progress: ' + action : 'Marked ' + action);
+      UI.notify(action === 'STAGE_NONE' ? 'EasySeek progress cleared. Workspace history is unchanged.' : action === 'NONE' ? 'EasySeek mark cleared. Workspace history is unchanged.' : S.stages.includes(action) ? 'Progress: ' + action : 'Marked ' + action);
       store.handoff(data, warning => UI.notify('Career Workspace: ' + warning));
     } catch (error) { fail(error); }
   }
@@ -47,7 +47,14 @@
     onRoute();
     if (!activePage()) return null;
     const detail = E.detail();
-    return detail && !isStale(detail) ? detail : null;
+    if (!detail || isStale(detail)) return null;
+    // Fill missing metadata only from the same source job ID, never a nearby job.
+    const sameJob = [...E.cards().values()].filter(job => job.id === detail.job.id && (job.platform || 'seek') === (detail.job.platform || 'seek'));
+    for (const key of ['company', 'location']) {
+      const values = [...new Set(sameJob.map(job => job[key]?.trim()).filter(Boolean))];
+      if (!detail.job[key]?.trim() && values.length === 1) detail.job[key] = values[0];
+    }
+    return detail;
   }
   function requireJob() {
     const detail = activeDetail();

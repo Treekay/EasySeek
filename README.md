@@ -289,3 +289,12 @@ browser fixtures (including connection settings and offline recovery). Reload th
 extension and job tabs after updating. The first optional permission prompt must
 be accepted in your own Chrome profile; automated fixtures use mocked extension
 permissions and do not modify your installed extension or personal data.
+
+### Clearing marks and import errors
+
+The page Mark menu offers **Clear mark** (Saved/Skip) and **Clear progress**
+(application stage). Clearing preserves history and does not delete or change an
+already imported Career Workspace application. Re-selecting Saved/Applied retries
+a handoff; it does not toggle the mark off. Import errors identify missing metadata;
+no tracker record is created until a valid handoff succeeds. Missing company/location
+can be filled from an unambiguous search card with the exact same source job ID.

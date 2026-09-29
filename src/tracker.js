@@ -17,8 +17,9 @@
   const permission = url => endpoint(url).replace(/:[0-9]+$/, '') + '/*';
   function payload(job, state, action, description) {
     const { id, platform, canonicalKey } = S.identity(job);
-    if (!['SAVED', 'APPLIED'].includes(action) || !/^[1-9][0-9]*$/.test(id) || !job.title?.trim() || !job.company?.trim())
-      throw new Error('Job ID, title or company is missing. Your EasySeek mark is saved.');
+    if (!['SAVED', 'APPLIED'].includes(action)) throw new Error('Unsupported tracker stage.');
+    const missing = [!(/^[1-9][0-9]*$/.test(id)) && 'job ID', !job.title?.trim() && 'title', !job.company?.trim() && 'company'].filter(Boolean);
+    if (missing.length) throw new Error('Cannot import: missing ' + missing.join(', ') + '. Your EasySeek mark is saved locally only. Wait for the full job to load, then select Saved/Applied again to retry.');
     const result = { source: platform, sourceJobId: id, canonicalKey: canonicalKey || platform + ':' + id,
       title: job.title, company: job.company, location: job.location || null,
       url: S.canonicalUrl(id, platform), mark: state.mark, requestedStage: action };

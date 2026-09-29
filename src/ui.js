@@ -53,7 +53,7 @@
       }
       node.append(row);
     }
-    for (const [label, mark] of [['Skip', 'SKIP'], ['Saved', 'SAVED'], ['Applied', 'APPLIED'], ['Interview', 'INTERVIEW'], ['Offered', 'OFFERED'], ['Rejected', 'REJECTED']]) {
+    for (const [label, mark] of [['Skip', 'SKIP'], ['Saved', 'SAVED'], ['Applied', 'APPLIED'], ['Interview', 'INTERVIEW'], ['Offered', 'OFFERED'], ['Rejected', 'REJECTED'], ['Clear mark', 'NONE'], ['Clear progress', 'STAGE_NONE']]) {
       const choice = button(label, 'mark-' + mark, () => { close(true); handlers.mark(mark); });
       choice.dataset.mark = mark; choices[mark] = choice; panels.mark.append(choice);
     }
@@ -86,7 +86,10 @@
       buttons.mark.title = detail ? `${detail.title} — ${state.mark} · ${stage}${state.viewed ? ' · Viewed' : ''}` : 'Open a job to mark it';
       buttons.mark.setAttribute('aria-label', detail ? 'Change job mark and progress: ' + state.mark + ', ' + stage : 'Open a job to mark it');
       buttons.filter.title = `${shown} jobs shown · ${hidden} hidden`;
-      for (const [mark, choice] of Object.entries(choices)) choice.setAttribute('aria-pressed', String(['SKIP', 'SAVED'].includes(mark) ? state.mark === mark : stage === mark));
+      for (const [mark, choice] of Object.entries(choices)) {
+        choice.setAttribute('aria-pressed', String(['SKIP', 'SAVED'].includes(mark) ? state.mark === mark : !['NONE', 'STAGE_NONE'].includes(mark) && stage === mark));
+        choice.disabled = mark === 'NONE' ? state.mark === 'NONE' : mark === 'STAGE_NONE' ? stage === 'NONE' : false;
+      }
       for (const [key, choice] of Object.entries(toggles)) choice.setAttribute('aria-pressed', String(!settings[key]));
     } };
   }

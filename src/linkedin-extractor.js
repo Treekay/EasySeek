@@ -69,7 +69,11 @@
       // The body component and title link must independently identify the same job.
       if (!links.length || links.some(link => S.linkedinJobId(link.href) !== id)) continue;
       const heading = links[0];
-      const company = [...scope.querySelectorAll('a[href*="/company/"]')].find(link => visible(link) && text(link) && (link.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING));
+      // LinkedIn places the company either before or after the title. Only use
+      // an unambiguous company in the header, never links inside JD/recommendations.
+      const companies = [...scope.querySelectorAll('a[href*="/company/"]')].filter(link => visible(link) && text(link) && !link.closest(selectors.card) && (link.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING));
+      const names = [...new Set(companies.map(text))];
+      const company = names.length === 1 ? companies[0] : null;
       const metadata = [...scope.querySelectorAll('p')].find(node =>
         (heading.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
         (node.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING) && text(node).includes('·') && /\b(?:ago|applicants|clicked apply)\b/i.test(text(node)));

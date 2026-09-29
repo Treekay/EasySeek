@@ -12,6 +12,11 @@
 <script>
 const S = EasySeekState, E = EasySeekExtractor;
 const realDetail = E.detail, realActive = E.active, realRouteId = E.routeId;
+const companyLink = document.querySelector('#detail a[href*="/company/"]');
+const jobTitle = document.querySelector('#detail a[href*="/jobs/view/"]');
+jobTitle.parentElement.after(companyLink);
+if (realDetail(document, 'https://www.linkedin.com/jobs/view/123/')?.job.company !== 'Example') throw new Error('Company below title must be extracted');
+
 // Map local fixture paths onto real LinkedIn routes; extraction and URL validation stay real.
 function route(url = location.href) { const params = new URL(url).searchParams; return 'https://www.linkedin.com' + (params.get('path') || '/jobs/search-results/') + (params.get('id') ? '?currentJobId=' + params.get('id') : ''); }
 E.detail = () => realDetail(document, route()); E.active = url => realActive(route(url)); E.routeId = url => realRouteId(route(url));
