@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Standalone LinkedIn metadata regression</title>
+<main><section id="detail" data-job-id="4341035834">
+<header><a href="https://www.linkedin.com/company/microsoft/"><img alt="Microsoft logo"></a><a href="https://www.linkedin.com/company/microsoft/">Microsoft</a>
+<div class="job-details-jobs-unified-top-card__job-title"><h1>Software Engineer</h1></div><p>New Zealand</p></header>
+<section><h2>People you can reach out to</h2><a href="https://www.linkedin.com/company/unrelated/">Unrelated</a></section>
+<section><h2>About the job</h2><div id="job-details">Full job description. <a href="https://www.linkedin.com/company/mentioned/">Mentioned vendor</a> Final requirement.</div></section>
+<section class="job-card-container"><a href="https://www.linkedin.com/jobs/view/999/">Other role</a><a href="https://www.linkedin.com/company/wrong/">Wrong company</a></section>
+</section></main><pre id="report">RUNNING</pre>
+<script src="../src/state.js"></script><script src="../src/linkedin-extractor.js"></script><script src="../src/tracker.js"></script>
+<script>
+try {
+ const assert=(v,m)=>{if(!v)throw new Error(m)};
+ const url='https://www.linkedin.com/jobs/view/4341035834/?trk=eml-email_jobs_saved_job_reminder_01-saved-jobs-0-view_job';
+ const read=()=>EasySeekExtractor.detail(document,url);
+ const job=read().job;
+ assert(job.company==='Microsoft','plain company link in standalone header');
+ for(const stage of ['SAVED','APPLIED']) {
+  const payload=EasySeekTracker.payload(job,{mark:'SAVED'},stage,job.description);
+  assert(payload.company==='Microsoft' && payload.sourceJobId==='4341035834' && payload.requestedStage===stage,'valid import metadata');
+ }
+ const header=document.querySelector('header');
+ const company=header.querySelectorAll('a')[1];
+ const hidden=document.createElement('span');hidden.className='job-details-jobs-unified-top-card__company-name';hidden.hidden=true;hidden.textContent='Stale company';header.prepend(hidden);
+ assert(read().job.company==='Microsoft','hidden stale company ignored');
+ const extra=document.createElement('a');extra.href='https://www.linkedin.com/company/ambiguous/';extra.textContent='Ambiguous';header.append(extra);
+ assert(read().job.company==='','ambiguous header rejected');extra.remove();
+ company.remove();
+ assert(read().job.company==='', 'missing header company must not use outreach, recommendations or JD companies');
+ document.querySelector('#report').textContent='PASS: standalone header company, Saved/Applied payloads, hidden/ambiguous metadata and unrelated companies';
+} catch(e) {document.querySelector('#report').textContent='FAIL: '+e.stack;}
+</script></html>

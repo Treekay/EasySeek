@@ -26,6 +26,21 @@
     }
     return '';
   }
+  function detailCompany(scope, heading, description) {
+    // Search the title's own header first. Standalone pages may use a plain
+    // company link without the legacy top-card company CSS classes.
+    const selector = selectors.detailCompany + ', a[href*="/company/"]';
+    for (let header = heading.parentElement; header && scope.contains(header); header = header.parentElement) {
+      const nodes = [...header.querySelectorAll(selector)].filter(node =>
+        visible(node) && text(node) && !node.closest(selectors.card) &&
+        !description.contains(node) && !node.contains(description) &&
+        Boolean(node.compareDocumentPosition(description) & Node.DOCUMENT_POSITION_FOLLOWING));
+      const names = [...new Set(nodes.map(text))];
+      if (names.length) return names.length === 1 ? names[0] : '';
+      if (header === scope || header.matches('header, .job-details-jobs-unified-top-card, .jobs-unified-top-card, .top-card-layout')) break;
+    }
+    return '';
+  }
   function cards(root = document) {
     const result = new Map();
     for (const link of root.querySelectorAll('a[href*="/jobs/view/"]')) {
@@ -69,11 +84,7 @@
       // The body component and title link must independently identify the same job.
       if (!links.length || links.some(link => S.linkedinJobId(link.href) !== id)) continue;
       const heading = links[0];
-      // LinkedIn places the company either before or after the title. Only use
-      // an unambiguous company in the header, never links inside JD/recommendations.
-      const companies = [...scope.querySelectorAll('a[href*="/company/"]')].filter(link => visible(link) && text(link) && !link.closest(selectors.card) && (link.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING));
-      const names = [...new Set(companies.map(text))];
-      const company = names.length === 1 ? companies[0] : null;
+      const company = detailCompany(scope, heading, body);
       const metadata = [...scope.querySelectorAll('p')].find(node =>
         (heading.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) &&
         (node.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING) && text(node).includes('·') && /\b(?:ago|applicants|clicked apply)\b/i.test(text(node)));
@@ -87,7 +98,7 @@
       if (more && descriptionText.endsWith(more)) descriptionText = descriptionText.slice(0, -more.length).trim();
       if (!descriptionText) continue;
       return { node: scope, heading, descriptionNode: description, job: {
-        platform: 'linkedin', id, title: text(heading), company: text(company), location: meta.split('·')[0].trim(),
+        platform: 'linkedin', id, title: text(heading), company, location: meta.split('·')[0].trim(),
         posted: meta.match(/(?:reposted\s+)?(?:\d+\s+(?:minute|hour|day|week|month|year)s?\s+ago|just now|today|yesterday)/i)?.[0] || '',
         salary: '', url: S.canonicalUrl(id, 'linkedin'), description: descriptionText
       } };
@@ -125,7 +136,7 @@
       const salaryText = read(scope, selectors.salary);
       const salary = /[$€£¥]|\b(?:NZD|USD|AUD|salary)\b/i.test(salaryText) ? salaryText : '';
       return { node: scope, heading, descriptionNode: description, job: {
-        platform: 'linkedin', id, title: text(heading), company: read(scope, selectors.detailCompany),
+        platform: 'linkedin', id, title: text(heading), company: detailCompany(scope, heading, description),
         location: read(scope, selectors.detailLocation), salary, posted,
         url: S.canonicalUrl(id, 'linkedin'), description: text(description)
       } };

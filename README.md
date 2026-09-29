@@ -298,3 +298,10 @@ already imported Career Workspace application. Re-selecting Saved/Applied retrie
 a handoff; it does not toggle the mark off. Import errors identify missing metadata;
 no tracker record is created until a valid handoff succeeds. Missing company/location
 can be filled from an unambiguous search card with the exact same source job ID.
+
+Standalone LinkedIn details now share header-scoped company extraction with SDUI:
+visible company links do not require legacy company CSS classes. The nearest header
+is preferred; hidden labels and conflicting names are rejected.
+`tests/linkedin-standalone-browser.html` is a synthetic regression based on the reported
+standalone layout, covering Saved/Applied payloads and unrelated-company exclusion;
+it is not a capture or verification of the user's authenticated DOM.
